@@ -1,3 +1,9 @@
+find_package(GTest)
+
+if (GTEST_FOUND)
+  include(GoogleTest)
+  add_subdirectory( XrdCl )
+endif()
 
 add_subdirectory( common )
 add_subdirectory( XrdClTests )
