@@ -1062,37 +1062,56 @@ void XrdHttpReq::mapXrdErrorToHttpStatus() {
 
 /**
  * Select the checksum to be computed depending on the userDigest passed in parameter
+ * @param configChecksumList the list of checksum names configured via the server xrootd.chksum configuration
  * @param userDigest the digest request from the user (extracted from the Want-Digest header)
- * @param selectedChecksum the checksum that will be performed
+ * @param xrootdSelectedChecksum the checksum that got selected to be performed later on
  */
-void XrdHttpReq::selectChecksum(const std::string &userDigest, std::string & selectedChecksum) {
-    char * configChecksumList = XrdHttpProtocol::xrd_cslist;
-    selectedChecksum = "unknown";
+void XrdHttpReq::selectXRootDChecksum(const char * configChecksumList, const std::string &userDigest, std::string & xrootdSelectedChecksum) {
+    xrootdSelectedChecksum = "unknown";
     if(configChecksumList != nullptr) {
         //The env variable is set, some checksums have been configured
-        std::vector<std::string> userDigestsVec;
-        XrdOucTUtils::splitString(userDigestsVec,userDigest,",");
-        std::vector<std::string> configChecksums;
-        XrdOucTUtils::splitString(configChecksums,configChecksumList,",");
-        selectedChecksum = configChecksums[0];
-        auto configChecksumItor = configChecksums.end();
-        std::find_if(userDigestsVec.begin(), userDigestsVec.end(), [&configChecksums, &configChecksumItor](const std::string & userDigest){
-            configChecksumItor = std::find_if(configChecksums.begin(),configChecksums.end(),[&userDigest](const std::string & configChecksum){
-                std::string userDigestTrimmed = userDigest;
+        std::vector<std::string> xrootdUserDigests;
+        determineXRootDChecksumFromUserDigest(userDigest, xrootdUserDigests);
+        //Get the checksums from the configuration
+        std::vector<std::string> xrootdConfigChecksums;
+        extractChecksumFromList(configChecksumList, xrootdConfigChecksums);
+        xrootdSelectedChecksum = xrootdConfigChecksums[0];
+        auto configChecksumItor = xrootdConfigChecksums.end();
+        std::find_if(xrootdUserDigests.begin(), xrootdUserDigests.end(), [&xrootdConfigChecksums, &configChecksumItor](const std::string & xrootdUserDigest){
+            configChecksumItor = std::find_if(xrootdConfigChecksums.begin(), xrootdConfigChecksums.end(), [&xrootdUserDigest](const std::string & configChecksum){
+                std::string userDigestTrimmed = xrootdUserDigest;
                 trim(userDigestTrimmed);
                 if(configChecksum.find(userDigestTrimmed) != std::string::npos) {
                     return true;
                 }
                 return false;
             });
-            return configChecksumItor != configChecksums.end();
+            return configChecksumItor != xrootdConfigChecksums.end();
         });
         //By default, the selected checksum is the first one of the configured checksum list.
-        // If the user gave a checksum that do not exist, then the checksum returned will be the default one
-        configChecksumItor = configChecksumItor != configChecksums.end() ? configChecksumItor : configChecksums.begin();
+        // If the user gave a checksum that does not exist, then the checksum returned will be the default one
+        configChecksumItor = configChecksumItor != xrootdConfigChecksums.end() ? configChecksumItor : xrootdConfigChecksums.begin();
         std::vector<std::string> checksumIdName;
         XrdOucTUtils::splitString(checksumIdName,*configChecksumItor,":");
-        selectedChecksum = checksumIdName[1];
+        xrootdSelectedChecksum = checksumIdName[1];
+    }
+}
+
+void XrdHttpReq::extractChecksumFromList(const std::string &checksumList, std::vector<std::string> &extractedChecksum) {
+    XrdOucTUtils::splitString(extractedChecksum,checksumList,",");
+}
+
+void XrdHttpReq::determineXRootDChecksumFromUserDigest(const std::string &userDigest, std::vector<std::string> &xrootdChecksums) {
+    //First, extract the user digests algorithms name
+    //Digests are separated by comas
+    std::vector<std::string> userDigestsVecWithWeights;
+    extractChecksumFromList(userDigest, userDigestsVecWithWeights);
+    //A weight can also be passed by the user for each digest with digestName;q=xx. We just discard them
+    for(auto digestWithWeight: userDigestsVecWithWeights) {
+        std::vector<std::string> currentDigest;
+        XrdOucTUtils::splitString(currentDigest, digestWithWeight, ";");
+        // Don't forget to convert the digest name coming from the user to an XRootD checksum name
+        xrootdChecksums.push_back(convert_digest_name(currentDigest[0]).c_str());
     }
 }
 
@@ -1169,15 +1188,15 @@ int XrdHttpReq::ProcessHTTPReq() {
         const char *opaque = strchr(resourceplusopaque.c_str(), '?');
         // Note that doChksum requires that the memory stays alive until the callback is invoked.
         m_resource_with_digest = resourceplusopaque;
-        std::string selectedChecksum;
-        selectChecksum(m_req_digest,selectedChecksum);
-        m_req_digest = convert_digest_name(selectedChecksum).c_str();
+        std::string selectedXRootDChecksum;
+        selectXRootDChecksum(XrdHttpProtocol::xrd_cslist, m_req_digest, selectedXRootDChecksum);
+        m_req_digest = convert_xrootd_to_rfc_name(selectedXRootDChecksum).c_str();
         if (!opaque) {
           m_resource_with_digest += "?cks.type=";
-          m_resource_with_digest += m_req_digest.c_str();
+          m_resource_with_digest += selectedXRootDChecksum.c_str();
         } else {
           m_resource_with_digest += "&cks.type=";
-          m_resource_with_digest += m_req_digest.c_str();
+          m_resource_with_digest += selectedXRootDChecksum.c_str();
         }
         if (prot->doChksum(m_resource_with_digest) < 0) {
           // In this case, the Want-Digest header was set and PostProcess gave the go-ahead to do a checksum.
