@@ -56,6 +56,7 @@
 #include <string>
 #include "XrdOuc/XrdOucTUtils.hh"
 #include "XrdOuc/XrdOucUtils.hh"
+#include "XrdHttpContentRangeParser.hh"
 
 #include "XrdHttpUtils.hh"
 
@@ -165,7 +166,12 @@ int XrdHttpReq::parseLine(char *line, int len) {
     } else if (!strcmp(key, "Host")) {
       parseHost(val);
     } else if (!strcmp(key, "Range")) {
-      parseContentRange(val);
+      XrdHttpContentRangeParser parser(READV_MAXCHUNKSIZE,filesize,rwOps,rwOps_split,length);
+      if(parser.parseContentRange(val)){
+        prot->SendSimpleResp(parser.getError().httpRetCode, NULL, NULL, parser.getError().errMsg.c_str(),0,false);
+        reset();
+        return -1;
+      }
     } else if (!strcmp(key, "Content-Length")) {
       length = atoll(val);
 
@@ -217,89 +223,6 @@ int XrdHttpReq::parseHost(char *line) {
   host = line;
   trim(host);
   return 0;
-}
-
-int XrdHttpReq::parseContentRange(char *line) {
-  int j;
-  char *str1, *saveptr1, *token;
-
-
-
-  for (j = 1, str1 = line;; j++, str1 = NULL) {
-    token = strtok_r(str1, " ,\n=", &saveptr1);
-    if (token == NULL)
-      break;
-
-    //printf("%d: %s\n", j, token);
-
-    if (!strlen(token)) continue;
-
-
-    parseRWOp(token);
-
-  }
-
-  return j;
-}
-
-int XrdHttpReq::parseRWOp(char *str) {
-  ReadWriteOp o1;
-  int j;
-  char *saveptr2, *str2, *subtoken, *endptr;
-  bool ok = false;
-
-  for (str2 = str, j = 0;; str2 = NULL, j++) {
-    subtoken = strtok_r(str2, "-", &saveptr2);
-    if (subtoken == NULL)
-      break;
-
-    switch (j) {
-      case 0:
-        o1.bytestart = strtoll(subtoken, &endptr, 0);
-        if (!o1.bytestart && (endptr == subtoken)) o1.bytestart = -1;
-        break;
-      case 1:
-        o1.byteend = strtoll(subtoken, &endptr, 0);
-        if (!o1.byteend && (endptr == subtoken)) o1.byteend = -1;
-        ok = true;
-        break;
-      default:
-        // Malformed!
-        ok = false;
-        break;
-    }
-
-  }
-
-
-  // This can be largely optimized
-  if (ok) {
-
-    kXR_int32 len_ok = 0;
-    long long sz = o1.byteend - o1.bytestart + 1;
-    kXR_int32 newlen = sz;
-
-    if (filesize > 0)
-      newlen = (kXR_int32) std::min(filesize - o1.bytestart, sz);
-
-    rwOps.push_back(o1);
-
-    while (len_ok < newlen) {
-      ReadWriteOp nfo;
-      int len = std::min(newlen - len_ok, READV_MAXCHUNKSIZE);
-
-      nfo.bytestart = o1.bytestart + len_ok;
-      nfo.byteend = nfo.bytestart + len - 1;
-      len_ok += len;
-      rwOps_split.push_back(nfo);
-    }
-    length += len_ok;
-
-
-  }
-
-
-  return j;
 }
 
 int XrdHttpReq::parseFirstLine(char *line, int len) {

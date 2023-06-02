@@ -1527,6 +1527,7 @@ int XrdHttpProtocol::StartSimpleResp(int code, const char *desc, const char *hea
     else if (code == 206) ss << "Partial Content";
     else if (code == 302) ss << "Redirect";
     else if (code == 307) ss << "Temporary Redirect";
+    else if (code == 400) ss << "Bad Request";
     else if (code == 403) ss << "Forbidden";
     else if (code == 404) ss << "Not Found";
     else if (code == 405) ss << "Method Not Allowed";

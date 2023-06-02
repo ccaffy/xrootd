@@ -44,6 +44,7 @@
 #include "XProtocol/XProtocol.hh"
 #include "XrdXrootd/XrdXrootdBridge.hh"
 #include "XrdHttpChecksumHandler.hh"
+#include "ReadWriteOp.hh"
 
 #include <vector>
 #include <string>
@@ -55,13 +56,9 @@
 
 
 #define READV_MAXCHUNKS            512
-#define READV_MAXCHUNKSIZE         (1024*128)
+#define READV_MAXCHUNKSIZE         (2*1024*1024 - 16)
 
-struct ReadWriteOp {
-  // < 0 means "not specified"
-  long long bytestart;
-  long long byteend;
-};
+
 
 struct DirListInfo {
   std::string path;
@@ -94,9 +91,7 @@ private:
   // after a response body has started
   bool m_status_trailer{false};
 
-  int parseContentRange(char *);
   int parseHost(char *);
-  int parseRWOp(char *);
 
   //xmlDocPtr xmlbody; /* the resulting document tree */
   XrdHttpProtocol *prot;

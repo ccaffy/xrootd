@@ -6,7 +6,8 @@
 #include <exception>
 #include <gtest/gtest.h>
 #include <string>
-
+#include <sstream>
+#include "XrdHttp/XrdHttpContentRangeParser.hh"
 
 
 using namespace testing;
@@ -164,4 +165,140 @@ TEST(XrdHttpTests, checksumHandlerSelectionTest) {
         handler.configure(configChecksumList);
         ASSERT_EQ(nullptr, handler.getChecksumToRun(reqDigest));
     }
+}
+
+TEST(XrdHttpTests, xrdHttpReqParseContentRangeTwoRangesOfSizeEqualToMaxChunkSize) {
+    long long length = 0;
+    int rangeBegin = 0;
+    int rangeEnd = 3;
+    int rangeBegin2 = 4;
+    int rangeEnd2 = 7;
+    int readvMaxChunkSize = 4;
+    std::stringstream ss;
+    ss << "bytes=" << rangeBegin << "-" << rangeEnd << ", " << rangeBegin2 << "-" << rangeEnd2;
+    char * range = const_cast<char *>(ss.str().c_str());
+    std::vector<ReadWriteOp> rwOps, rwOps_split;
+    XrdHttpContentRangeParser parser(readvMaxChunkSize,0,rwOps,rwOps_split,length);
+    parser.parseContentRange(range);
+    ASSERT_EQ(2,rwOps_split.size());
+    ASSERT_EQ(0, rwOps_split[0].bytestart);
+    ASSERT_EQ(3, rwOps_split[0].byteend);
+    ASSERT_EQ(4, rwOps_split[1].bytestart);
+    ASSERT_EQ(7, rwOps_split[1].byteend);
+    ASSERT_EQ(2,rwOps.size());
+    ASSERT_EQ(8,length);
+}
+
+TEST(XrdHttpTests, xrdHttpReqParseContentRangeOneRangeSizeLessThanMaxChunkSize) {
+  long long length = 0;
+  int rangeBegin = 0;
+  int rangeEnd = 3;
+  int readvMaxChunkSize = 5;
+  std::stringstream ss;
+  ss << "bytes=" << rangeBegin << "-" << rangeEnd;
+  char * range = const_cast<char *>(ss.str().c_str());
+  std::vector<ReadWriteOp> rwOps, rwOps_split;
+  XrdHttpContentRangeParser parser(readvMaxChunkSize,0,rwOps,rwOps_split,length);
+  parser.parseContentRange(range);
+  ASSERT_EQ(1,rwOps_split.size());
+  ASSERT_EQ(0, rwOps_split[0].bytestart);
+  ASSERT_EQ(3, rwOps_split[0].byteend);
+  ASSERT_EQ(1,rwOps.size());
+  ASSERT_EQ(4,length);
+}
+
+TEST(XrdHttpTests, xrdHttpReqParseContentRangeOneRangeSizeGreaterThanMaxChunkSize) {
+  long long length = 0;
+  int rangeBegin = 0;
+  int rangeEnd = 7;
+  int readvMaxChunkSize = 3;
+  std::stringstream ss;
+  ss << "bytes=" << rangeBegin << "-" << rangeEnd;
+  char * range = const_cast<char *>(ss.str().c_str());
+  std::vector<ReadWriteOp> rwOps, rwOps_split;
+  XrdHttpContentRangeParser parser(readvMaxChunkSize,0,rwOps,rwOps_split,length);
+  parser.parseContentRange(range);
+  ASSERT_EQ(3,rwOps_split.size());
+  ASSERT_EQ(0, rwOps_split[0].bytestart);
+  ASSERT_EQ(2, rwOps_split[0].byteend);
+  ASSERT_EQ(3, rwOps_split[1].bytestart);
+  ASSERT_EQ(5, rwOps_split[1].byteend);
+  ASSERT_EQ(6, rwOps_split[2].bytestart);
+  ASSERT_EQ(7, rwOps_split[2].byteend);
+  ASSERT_EQ(1,rwOps.size());
+  ASSERT_EQ(8,length);
+}
+
+TEST(XrdHttpTests, xrdHttpReqParseContentRangeRange0ToEnd) {
+  long long length = 0;
+  int rangeBegin = 0;
+  int readvMaxChunkSize = 4;
+  std::stringstream ss;
+  ss << "bytes=" << rangeBegin << "-" << "\r";
+  char * range = const_cast<char *>(ss.str().c_str());
+  std::vector<ReadWriteOp> rwOps, rwOps_split;
+  XrdHttpContentRangeParser parser(readvMaxChunkSize,0,rwOps,rwOps_split,length);
+  parser.parseContentRange(range);
+  ASSERT_EQ(0,rwOps_split.size());
+  ASSERT_EQ(1,rwOps.size());
+  ASSERT_EQ(0,rwOps[0].bytestart);
+  ASSERT_EQ(-1,rwOps[0].byteend);
+  ASSERT_EQ(0,length);
+}
+
+TEST(XrdHttpTests, xrdHttpReqParseContentRangeRange0To0) {
+  long long length = 0;
+  int rangeBegin = 0;
+  int rangeEnd = 0;
+  int readvMaxChunkSize = 4;
+  std::stringstream ss;
+  ss << "bytes=" << rangeBegin << "-" << rangeEnd;
+  char * range = const_cast<char *>(ss.str().c_str());
+  std::vector<ReadWriteOp> rwOps, rwOps_split;
+  XrdHttpContentRangeParser parser(readvMaxChunkSize,0,rwOps,rwOps_split,length);
+  parser.parseContentRange(range);
+  ASSERT_EQ(1,rwOps_split.size());
+  ASSERT_EQ(1,rwOps.size());
+  ASSERT_EQ(0,rwOps[0].bytestart);
+  ASSERT_EQ(0,rwOps[0].byteend);
+  ASSERT_EQ(1,length);
+}
+
+TEST(XrdHttpTests, xrdHttpReqParseContentRangeRangeEndByteGreaterThanFileSize) {
+  long long length = 0;
+  long long fileSize = 2;
+  int rangeBegin = 0;
+  int rangeEnd = 4;
+  int readvMaxChunkSize = 10;
+  std::stringstream ss;
+  ss << "bytes=" << rangeBegin << "-" << rangeEnd;
+  char * range = const_cast<char *>(ss.str().c_str());
+  std::vector<ReadWriteOp> rwOps, rwOps_split;
+  XrdHttpContentRangeParser parser(readvMaxChunkSize,fileSize, rwOps,rwOps_split,length);
+  ASSERT_EQ(0,parser.parseContentRange(range));
+  ASSERT_EQ(1,rwOps_split.size());
+  ASSERT_EQ(0,rwOps_split[0].bytestart);
+  ASSERT_EQ(1,rwOps_split[0].byteend);
+  ASSERT_EQ(1,rwOps.size());
+  ASSERT_EQ(0,rwOps[0].bytestart);
+  ASSERT_EQ(4,rwOps[0].byteend);
+  ASSERT_EQ(2,length);
+}
+
+TEST(XrdHttpTests, xrdHttpReqParseContentRangeRangeBeginGreaterThanFileSize) {
+  long long length = 0;
+  long long fileSize = 2;
+  int rangeBegin = 4;
+  int rangeEnd = 6;
+  int readvMaxChunkSize = 10;
+  std::stringstream ss;
+  ss << "bytes=" << rangeBegin << "-" << rangeEnd;
+  char * range = const_cast<char *>(ss.str().c_str());
+  std::vector<ReadWriteOp> rwOps, rwOps_split;
+  XrdHttpContentRangeParser parser(readvMaxChunkSize,fileSize, rwOps,rwOps_split,length);
+  ASSERT_NE(0,parser.parseContentRange(range));
+  ASSERT_EQ(400,parser.getError().httpRetCode);
+  ASSERT_EQ(0,rwOps_split.size());
+  ASSERT_EQ(1,rwOps.size());
+  ASSERT_EQ(0,length);
 }
