@@ -47,6 +47,7 @@
 #include "Xrd/XrdProtocol.hh"
 #include "XrdOuc/XrdOucHash.hh"
 #include "XrdHttpChecksumHandler.hh"
+#include "XrdNet/XrdNetPMark.hh"
 
 #include <openssl/ssl.h>
 
@@ -131,6 +132,9 @@ public:
 
   /// called via https
   bool isHTTPS() { return ishttps; }
+
+  // Packet marking instance
+  static XrdNetPMark * pMark;
 
 private:
 

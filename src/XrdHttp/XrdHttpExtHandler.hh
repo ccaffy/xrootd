@@ -33,6 +33,8 @@
 #ifndef __XRDHTTPEXTHANDLER_H__
 #define __XRDHTTPEXTHANDLER_H__
 
+#include "XrdNet/XrdNetPMark.hh"
+
 #include <map>
 #include <string>
 
@@ -54,6 +56,9 @@ public:
   
   std::string clientdn, clienthost, clientgroups;
   long long length;
+
+  // Packet marking instance
+  XrdNetPMark * pMark;
 
   // Get full client identifier
   void GetClientID(std::string &clid);

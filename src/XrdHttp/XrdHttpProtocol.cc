@@ -111,6 +111,8 @@ BIO_METHOD *XrdHttpProtocol::m_bio_method = NULL; // BIO method constructor.
 char *XrdHttpProtocol::xrd_cslist = nullptr;
 XrdHttpChecksumHandler XrdHttpProtocol::cksumHandler = XrdHttpChecksumHandler();
 
+XrdNetPMark * XrdHttpProtocol::pMark = nullptr;
+
 XrdSysTrace XrdHttpTrace("http");
 
 namespace
@@ -1700,6 +1702,10 @@ int XrdHttpProtocol::Configure(char *parms, XrdProtocol_Config * pi) {
 
   } else {
     eDest.Emsg("Config", "No XRDROLE specified.");
+  }
+  
+  if(pi->theEnv) {
+    pMark = (XrdNetPMark*)pi->theEnv->GetPtr("XrdNetPMark*");
   }
 
   // Schedule protocol object cleanup

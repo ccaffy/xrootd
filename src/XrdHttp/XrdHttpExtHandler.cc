@@ -84,7 +84,7 @@ const XrdSecEntity &XrdHttpExtReq::GetSecEntity() const
 
 
 XrdHttpExtReq::XrdHttpExtReq(XrdHttpReq *req, XrdHttpProtocol *pr): prot(pr),
-verb(req->requestverb), headers(req->allheaders) {
+verb(req->requestverb), headers(req->allheaders), pMark(prot->pMark) {
   // Here we fill the request summary with all the fields we can
   resource = req->resource.c_str();
   int envlen = 0;
