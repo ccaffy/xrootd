@@ -95,8 +95,12 @@ void CurlDeleter::operator()(CURL *curl)
  *       was needed for monitoring to report what IP protocol was being used.
  *       It has been kept in case we will need this callback in the future.
  */
-int TPCHandler::sockopt_setcloexec_callback(void *clientp, curl_socket_t curlfd, curlsocktype purpose) {
-    int oldFlags = fcntl(curlfd,F_GETFD,0);
+int TPCHandler::sockopt_callback(void *clientp, curl_socket_t curlfd, curlsocktype purpose) {
+  if(purpose == curlsocktype::CURLSOCKTYPE_IPCXN) {
+    return CURL_SOCKOPT_ALREADY_CONNECTED;
+  }
+  return CURL_SOCKOPT_OK;
+    /*int oldFlags = fcntl(curlfd,F_GETFD,0);
     if(oldFlags < 0) {
         return CURL_SOCKOPT_ERROR;
     }
@@ -104,7 +108,7 @@ int TPCHandler::sockopt_setcloexec_callback(void *clientp, curl_socket_t curlfd,
     if(!fcntl(curlfd,F_SETFD,oldFlags)) {
         return CURL_SOCKOPT_OK;
     }
-    return CURL_SOCKOPT_ERROR;
+    return CURL_SOCKOPT_ERROR;*/
 }
 
 /******************************************************************************/
@@ -132,7 +136,11 @@ int TPCHandler::opensocket_callback(void *clientp,
   {XrdNetAddr thePeer(&(aInfo->addr));
     rec->isIPv6 =  (thePeer.isIPType(XrdNetAddrInfo::IPv6)
                     && !thePeer.isMapped());
-    // Register the socket to the packet marking manager
+    // Connect the socket and register it to the packet marking manager
+    if(connect(fd, (struct sockaddr*)&(aInfo->addr), aInfo->addrlen) ==
+       -1) {
+      return CURL_SOCKET_BAD;
+    }
     rec->pmarkManager.addFd(fd,&aInfo->addr);
   }
 
@@ -873,10 +881,10 @@ int TPCHandler::ProcessPushReq(const std::string & resource, XrdHttpExtReq &req)
         return req.SendSimpleResp(rec.status, NULL, NULL, msg, 0);
     }
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
-//  curl_easy_setopt(curl, CURLOPT_SOCKOPTFUNCTION, sockopt_setcloexec_callback);
     curl_easy_setopt(curl, CURLOPT_OPENSOCKETFUNCTION, opensocket_callback);
     curl_easy_setopt(curl, CURLOPT_OPENSOCKETDATA, &rec);
     curl_easy_setopt(curl, CURLOPT_CLOSESOCKETFUNCTION, closesocket_callback);
+    curl_easy_setopt(curl, CURLOPT_SOCKOPTFUNCTION, sockopt_callback);
     curl_easy_setopt(curl, CURLOPT_CLOSESOCKETDATA, &rec);
     auto query_header = req.headers.find("xrd-http-fullresource");
     std::string redirect_resource = req.resource;
@@ -987,9 +995,9 @@ int TPCHandler::ProcessPullReq(const std::string &resource, XrdHttpExtReq &req) 
         curl_easy_setopt(curl, CURLOPT_INTERFACE, ip);
     }
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
-//  curl_easy_setopt(curl,CURLOPT_SOCKOPTFUNCTION,sockopt_setcloexec_callback);
     curl_easy_setopt(curl, CURLOPT_OPENSOCKETFUNCTION, opensocket_callback);
     curl_easy_setopt(curl, CURLOPT_OPENSOCKETDATA, &rec);
+    curl_easy_setopt(curl, CURLOPT_SOCKOPTFUNCTION, sockopt_callback);
     curl_easy_setopt(curl, CURLOPT_CLOSESOCKETFUNCTION, closesocket_callback);
     curl_easy_setopt(curl, CURLOPT_CLOSESOCKETDATA, &rec);
     std::unique_ptr<XrdSfsFile> fh(m_sfs->newFile(name, m_monid++));

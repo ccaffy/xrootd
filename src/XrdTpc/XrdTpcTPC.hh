@@ -51,7 +51,7 @@ public:
 
 private:
 
-    static int sockopt_setcloexec_callback(void * clientp, curl_socket_t curlfd, curlsocktype purpose);
+    static int sockopt_callback(void * clientp, curl_socket_t curlfd, curlsocktype purpose);
     static int opensocket_callback(void *clientp,
                                    curlsocktype purpose,
                                    struct curl_sockaddr *address);
