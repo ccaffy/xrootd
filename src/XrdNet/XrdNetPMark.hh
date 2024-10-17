@@ -55,7 +55,8 @@ class Handle
                         : appName(strdup(app)), eCode(ecode), aCode(acode) {}
 
                   Handle(Handle &h)
-                        : appName(h.appName), eCode(h.eCode), aCode(h.aCode) {}
+                        : appName(strdup(h.appName)), eCode(h.eCode),
+                          aCode(h.aCode) {}
 
       virtual    ~Handle() {if(appName) free(appName);}
 
