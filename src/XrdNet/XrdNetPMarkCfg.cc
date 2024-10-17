@@ -217,7 +217,7 @@ XrdNetPMark::Handle *XrdNetPMarkCfg::Begin(XrdSecEntity &client,
            while(*aP && *aP != '&') aP++;
            int apLen = aP - apP;
            if (apLen > 0)
-              {altApp = apP;
+              {altApp = "";
                altApp.insert(apP, 0, apLen);
                app = altApp.c_str();
               }
