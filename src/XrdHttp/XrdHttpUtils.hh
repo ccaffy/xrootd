@@ -39,7 +39,9 @@
 #include "XrdSec/XrdSecEntity.hh"
 #include "XrdOuc/XrdOucIOVec.hh"
 #include <string>
+#include <cstring>
 #include <vector>
+#include <curl/curl.h>
 
 #ifndef XRDHTTPUTILS_HH
 #define	XRDHTTPUTILS_HH
@@ -80,9 +82,93 @@ bool Fromhexdigest(const unsigned char *input, int length, unsigned char *out);
 void Tobase64(const unsigned char *input, int length, char *out);
 
 
+/**
+ * Encodes the URL passed in parameter (converts all letters consider illegal in URLs to their
+ * %XX versions).
+ * All input characters that are not a-z, A-Z, 0-9, '-', '.', '_' or '~' are
+ * converted to their "URL escaped" version (%NN where NN is a two-digit hexadecimal number).
+ * Returns a std::string containing the encoded string
+ */
+template<typename T = std::string>
+typename std::enable_if<std::is_same<T,std::string>::value,std::string>::type
+ encode_str(const char * str) {
+  if(!str) { return {}; }
+  char* output = curl_easy_escape(NULL, str, ::strlen(str));
+  if (!output) {
+    return std::string(str);
+  }
+
+  std::string result(output);
+  curl_free(output);
+  return result;
+}
+
+/**
+ * Encodes the string passed in parameter (converts all letters consider illegal in URLs to their
+ * %XX versions).
+ * All input characters that are not a-z, A-Z, 0-9, '-', '.', '_' or '~' are
+ * converted to their "URL escaped" version (%NN where NN is a two-digit hexadecimal number).
+ * Returns a char * containing the encoded string.
+ * !!! IT MUST BE FREED AFTER USAGE USING free(...) !!!
+ */
+template<typename T = char *>
+typename std::enable_if<std::is_same<T,char *>::value,char *>::type
+encode_str(const char * str) {
+  if(!str) {return nullptr;}
+  char* output = curl_easy_escape(NULL, str, ::strlen(str));
+  if (!output) {
+    return nullptr;
+  }
+  char * result = strdup(output);
+  curl_free(output);
+  return result;
+}
+
+/**
+ * Decodes the string passed in parameter (converts all %XX codes to their 8bit
+ * versions)
+ * Returns the std::string containing the decoded string.
+ */
+template<typename T = std::string>
+typename std::enable_if<std::is_same<T,std::string>::value, std::string>::type
+ decode_str(const char * str) {
+  int out_length = 0;
+  if(!str) {return {};}
+  char* output = curl_easy_unescape(NULL, str, ::strlen(str), &out_length);
+  if (!output) {
+    return std::string(str);
+  }
+
+  std::string result(output, out_length);
+  curl_free(output);
+  return result;
+}
+
+/**
+ * Decodes the string passed in parameter (converts all %XX codes to their 8bit
+ * versions)
+ * Returns a char * containing the decoded string.
+ * !!! IT MUST BE FREED AFTER USAGE USING free(...) !!!
+ */
+template<typename T = char *>
+typename std::enable_if<std::is_same<T,char *>::value, char *>::type
+decode_str(const char * str) {
+  int out_length = 0;
+  if(!str) {return nullptr;}
+  char* output = curl_easy_unescape(NULL, str, ::strlen(str), &out_length);
+  if (!output) {
+    return nullptr;
+  }
+
+  char* result = static_cast<char*>(malloc(out_length + 1));
+  std::memcpy(result,output,out_length);
+  result[out_length] = '\0';
+  curl_free(output);
+  return result;
+}
+
 // Create a new quoted string
 char *quote(const char *str);
-
 // unquote a string and return a new one
 char *unquote(char *str);
 

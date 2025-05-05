@@ -2,6 +2,8 @@ if(NOT BUILD_HTTP)
   return()
 endif()
 
+find_package(CURL 7.9.6)
+
 # Note that XrdHttpUtils is marked as a shared library as XrdHttp plugins
 # are expected to link against it for the XrdHttpExt class implementations.
 
@@ -30,6 +32,7 @@ target_link_libraries(XrdHttpUtils
   PUBLIC
     OpenSSL::SSL
     OpenSSL::Crypto
+    CURL::libcurl
 )
 
 set(XrdHttp XrdHttp-${PLUGIN_VERSION})
