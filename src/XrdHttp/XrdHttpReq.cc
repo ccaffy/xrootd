@@ -40,6 +40,7 @@
 #include "XrdHttpReq.hh"
 #include "XrdHttpTrace.hh"
 #include "XrdHttpExtHandler.hh"
+#include "XrdHttpHeaderUtils.hh"
 #include <cstring>
 #include <arpa/inet.h>
 #include <sstream>
@@ -206,6 +207,8 @@ int XrdHttpReq::parseLine(char *line, int len) {
     } else if (!strcasecmp(key, "user-agent")) {
       m_user_agent = val;
       trim(m_user_agent);
+    } else if (!strcasecmp(key,"repr-digest")) {
+      XrdHttpHeaderUtils::parseReprDigest(val, mReprDigest);
     } else {
       // Some headers need to be translated into "local" cgi info.
       auto it = std::find_if(prot->hdr2cgimap.begin(), prot->hdr2cgimap.end(),[key](const auto & item) {
@@ -2890,6 +2893,8 @@ void XrdHttpReq::reset() {
   final = false;
 
   mScitag = -1;
+
+  mReprDigest.clear();
 }
 
 void XrdHttpReq::getfhandle() {
