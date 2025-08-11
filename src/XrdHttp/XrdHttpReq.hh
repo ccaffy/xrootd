@@ -357,7 +357,8 @@ public:
 
   int mScitag;
 
-
+  /// Repr-Digest map where the key is the digest name and the value is the base64 encoded digest value
+  std::map<std::string,std::string> mReprDigest;
 
 
 
