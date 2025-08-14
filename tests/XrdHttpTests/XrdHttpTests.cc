@@ -629,3 +629,22 @@ TEST(XrdHttpTests, parseReprDigest) {
     ASSERT_EQ(expectedMap, output);
   }
 }
+
+static inline const std::pair<std::string, std::map<std::string, ushort>> wantReprDigests[] {
+  {"",{}},
+  {"adler=1",{{"adler",1}}},
+  {"adler=1, sha-512=2",{{"adler",1},{"sha-512",2}}},
+  {"adler=",{}},
+  {"adler=azerty",{}},
+  {"adler=-1",{}},
+  {"adler=11",{{"adler",10}}},
+  {"=",{}},
+};
+
+TEST(XrdHttpTests, parseWantReprDigest) {
+  for(const auto & [input, expectedMap]: wantReprDigests) {
+    std::map<std::string,ushort> output;
+    XrdHttpHeaderUtils::parseWantReprDigest(input,output);
+    ASSERT_EQ(expectedMap, output);
+  }
+}

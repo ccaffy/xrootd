@@ -139,6 +139,8 @@ static void trim(std::string & str);
 
 static void trim(std::string_view & sv);
 
+static ushort toushort(std::string_view & sv);
+
     XrdOucUtils() {}
     ~XrdOucUtils() {}
 

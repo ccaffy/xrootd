@@ -209,6 +209,8 @@ int XrdHttpReq::parseLine(char *line, int len) {
       trim(m_user_agent);
     } else if (!strcasecmp(key,"repr-digest")) {
       XrdHttpHeaderUtils::parseReprDigest(val, mReprDigest);
+    } else if (!strcasecmp(key,"want-repr-digest")) {
+      XrdHttpHeaderUtils::parseWantReprDigest(val,mWantReprDigest);
     } else {
       // Some headers need to be translated into "local" cgi info.
       auto it = std::find_if(prot->hdr2cgimap.begin(), prot->hdr2cgimap.end(),[key](const auto & item) {
@@ -2895,6 +2897,8 @@ void XrdHttpReq::reset() {
   mScitag = -1;
 
   mReprDigest.clear();
+
+  mWantReprDigest.clear();
 }
 
 void XrdHttpReq::getfhandle() {

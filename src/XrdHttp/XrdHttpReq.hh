@@ -360,6 +360,9 @@ public:
   /// Repr-Digest map where the key is the digest name and the value is the base64 encoded digest value
   std::map<std::string,std::string> mReprDigest;
 
+  /// Want-Repr-Digest map where the key is the digest name and the value is
+  /// the preference (between 0 and 9)
+  std::map<std::string,ushort> mWantReprDigest;
 
 
   /// Crunch an http request.

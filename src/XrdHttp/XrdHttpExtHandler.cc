@@ -117,6 +117,7 @@ verb(req->requestverb), headers(req->allheaders) {
   pmark = prot->pmarkHandle;
   mSciTag = req->mScitag;
   mReprDigest = req->mReprDigest;
+  mWantReprDigest = req->mWantReprDigest;
   tpcForwardCreds = prot->tpcForwardCreds;
 
   length = req->length;

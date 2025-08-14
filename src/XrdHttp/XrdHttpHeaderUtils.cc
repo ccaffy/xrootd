@@ -27,15 +27,15 @@
 #include <algorithm>
 
 
-void XrdHttpHeaderUtils::parseReprDigest(const std::string &header, std::map<std::string, std::string> &output) {
+void XrdHttpHeaderUtils::parseReprDigest(const std::string &value, std::map<std::string, std::string> &output) {
   // Expected format per entry: <cksumType>=:<digestValue>:
   std::vector<std::string> digestNameValuePairs;
-  XrdOucTUtils::splitString(digestNameValuePairs, header, ",");
+  XrdOucTUtils::splitString(digestNameValuePairs, value, ",");
 
   for (const auto &digestNameValue : digestNameValuePairs) {
     std::string_view digestNameValueSV {digestNameValue};
     auto equalPos = digestNameValueSV.find('=');
-    if (equalPos == std::string::npos || equalPos >= digestNameValueSV.size() - 1)
+    if (equalPos == std::string_view::npos || equalPos >= digestNameValueSV.size() - 1)
       continue;
 
     std::string_view cksumTypeSV = digestNameValueSV.substr(0, equalPos);
@@ -55,5 +55,30 @@ void XrdHttpHeaderUtils::parseReprDigest(const std::string &header, std::map<std
         output[std::string(cksumTypeSV)] = cksumValue;
     }
     // Malformed entries are silently ignored
+  }
+}
+
+void XrdHttpHeaderUtils::parseWantReprDigest(const std::string & value, std::map<std::string, ushort> &output) {
+  // Expected format per entry: <cksumType>=<preference>
+  std::vector<std::string_view> digestPreferencePairs;
+  XrdOucTUtils::splitString(digestPreferencePairs,value,",");
+
+  for (const auto & digestPreference: digestPreferencePairs) {
+    std::vector<std::string_view> digestNameValue;
+    XrdOucTUtils::splitString(digestNameValue,digestPreference,"=");
+    if (digestNameValue.size() >= 2 && digestNameValue.size() % 2 == 0) {
+      try {
+        ushort preference = XrdOucUtils::toushort(digestNameValue[1]);
+        if(preference > 10) {
+          // Max value for preference according to rfc9530 is 10
+          preference = 10;
+        }
+        XrdOucUtils::trim(digestNameValue[0]);
+        output.emplace(digestNameValue[0],preference);
+        // Discard invalid values
+      } catch (...) {
+        // Discard invalid values
+      }
+    }
   }
 }

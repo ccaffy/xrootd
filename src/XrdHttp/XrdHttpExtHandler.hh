@@ -65,6 +65,8 @@ public:
 
   /// Repr-Digest map where the key is the digest name and the value is the base64 encoded digest value
   std::map<std::string,std::string> mReprDigest;
+  /// Want-Repr-Digest map where the key is the digest name and the value is the weighted preference
+  std::map<std::string, ushort> mWantReprDigest;
   // Get full client identifier
   void GetClientID(std::string &clid);
   
