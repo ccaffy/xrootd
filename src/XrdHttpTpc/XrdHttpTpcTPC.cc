@@ -554,6 +554,7 @@ int TPCHandler::SendPerfMarker(XrdHttpExtReq &req, TPCLogRecord &rec, std::vecto
 int TPCHandler::RunCurlWithUpdates(CURL *curl, XrdHttpExtReq &req, State &state,
     TPCLogRecord &rec)
 {
+    bool clientPassiveDigestVerified = false;
     // Create the multi-handle and add in the current transfer to it.
     CURLM *multi_handle = curl_multi_init();
     if (!multi_handle) {
@@ -644,6 +645,41 @@ int TPCHandler::RunCurlWithUpdates(CURL *curl, XrdHttpExtReq &req, State &state,
         } else if (running_handles == 0) {
             break;
         }
+
+      if (!clientPassiveDigestVerified) {
+        if (req.mReprDigest.size()) {
+          const auto & passiveSrvReprDigest = state.GetReprDigest();
+          if (passiveSrvReprDigest.size()) {
+            clientPassiveDigestVerified = true;
+            for(const auto & passiveSrvReprDigestItor: passiveSrvReprDigest) {
+              std::stringstream ss;
+              ss << "Repr-Digest header returned by remote server=" << passiveSrvReprDigestItor.first << "=" << passiveSrvReprDigestItor.second;
+              logTransferEvent(LogMask::Debug, rec, "MULTISTREAM_ERROR",
+                               ss.str());
+            }
+            /*
+            bool foundMatchingReprDigest = false;
+            auto reqReprDigestItor = req.mReprDigest.begin();
+            while(reqReprDigestItor != req.mReprDigest.end() && !foundMatchingReprDigest) {
+              auto passiveSrvReprDigestItor = passiveSrvReprDigest.find(reqReprDigestItor->first);
+              if(passiveSrvReprDigestItor != passiveSrvReprDigest.end()) {
+                foundMatchingReprDigest = true;
+                // We have a match in terms of digest name
+                // compare the values
+                if (reqReprDigestItor->second != passiveSrvReprDigestItor->second) {
+
+                }
+              }
+              reqReprDigestItor++;
+            }*/
+          } else {
+            /*std::stringstream ss;
+            ss << "No Repr-Digest header returned by remote server";
+            logTransferEvent(LogMask::Debug, rec, "MULTISTREAM_ERROR",
+                             ss.str());*/
+          }
+        }
+      }
 
         rec.pmarkManager.beginPMarks();
         //printf("There are %d running handles\n", running_handles);

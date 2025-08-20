@@ -8,6 +8,7 @@
 
 #include <memory>
 #include <vector>
+#include <optional>
 
 // Forward dec'ls
 class XrdSfsFile;
@@ -92,6 +93,8 @@ public:
     void SetContentLength(const off_t content_length) { m_content_length = content_length; }
 
     off_t GetContentLength() const {return m_content_length;}
+
+    const std::map<std::string, std::string> & GetReprDigest() const { return m_repr_digests; }
 
     int GetErrorCode() const {return m_error_code;}
 
@@ -181,6 +184,7 @@ private:
     std::string m_error_buf;  // Any error associated with a response.
     bool m_is_transfer_state; // If set to true, this state will be used to perform some transfers
     bool tpcForwardCreds = false; // if set to true, the redirection will send user credentials to the redirection host
+    std::map<std::string, std::string> m_repr_digests; // Repr-Digest values received from the passive server (PULL)
 };
 
 };

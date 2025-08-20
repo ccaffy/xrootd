@@ -13,6 +13,8 @@
 #include "XrdHttpTpcState.hh"
 #include "XrdHttpTpcStream.hh"
 
+#include "XrdHttp/XrdHttpHeaderUtils.hh"
+
 using namespace TPC;
 
 
@@ -54,6 +56,7 @@ void State::Move(State &other)
     other.m_curl = NULL;
     other.m_headers = NULL;
     other.m_stream = NULL;
+    other.m_repr_digests = m_repr_digests;
 }
 
 
@@ -166,6 +169,7 @@ void State::ResetAfterRequest() {
     m_push_length = -1;
     m_recv_all_headers = false;
     m_recv_status_line = false;
+    m_repr_digests.clear();
 }
 
 size_t State::HeaderCB(char *buffer, size_t size, size_t nitems, void *userdata)
@@ -213,6 +217,9 @@ int State::Header(const std::string &header) {
                     //printf("Content-length header unparseable\n");
                     return 0;
                 }
+            }
+            if(!m_push && m_is_transfer_state && header_name == "repr-digest") {
+              XrdHttpHeaderUtils::parseReprDigest(header_value,m_repr_digests);
             }
         } else {
             // Non-empty header that isn't the status line, but no ':' present --
