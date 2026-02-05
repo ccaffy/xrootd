@@ -161,6 +161,7 @@ static std::string UrlDecode(const std::string &input);
 #if HAVE_STATX
 static void TimeSpec2StatxTS(const timespec& ts, struct statx_timestamp& out);
 static void Stat2Statx(const struct stat *, struct statx *, unsigned int mask = 0);
+static dev_t Makedev(const struct statx *);
 #endif
 
     XrdOucUtils() {}

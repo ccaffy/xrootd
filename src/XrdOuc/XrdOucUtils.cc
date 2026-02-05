@@ -1397,6 +1397,10 @@ void XrdOucUtils::Stat2Statx(const struct stat* in, struct statx* out, unsigned 
   out->stx_rdev_major = static_cast<unsigned int>(major(in->st_rdev));
   out->stx_rdev_minor = static_cast<unsigned int>(minor(in->st_rdev));
 }
+
+dev_t XrdOucUtils::Makedev(const struct statx * buff) {
+   return makedev(buff->stx_dev_major,buff->stx_dev_minor);
+}
 #endif
 
 /******************************************************************************/
