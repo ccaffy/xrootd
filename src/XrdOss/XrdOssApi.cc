@@ -1233,6 +1233,13 @@ int XrdOssFile::Fstat(struct stat *buff)
     return (fstat(fd, buff) ? -errno : XrdOssOK);
 }
 
+#if HAVE_STATX
+int XrdOssFile::Statx(struct statx * buff, unsigned int mask) {
+   if (mask == 0) mask = STATX_BASIC_STATS;
+   return (statx(fd, "", AT_EMPTY_PATH, mask, buff) ? -errno : XrdOssOK);
+}
+#endif
+
 /******************************************************************************/
 /*                               F s y n c                                    */
 /******************************************************************************/

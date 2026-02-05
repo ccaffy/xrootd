@@ -36,6 +36,7 @@
 #include <unordered_set>
 #include <vector>
 #include <cstdint>
+#include "XrdSys/XrdSysPlatform.hh"
 
 class XrdSysError;
 class XrdOucString;
@@ -156,6 +157,11 @@ static uint8_t touint8_t(const std::string_view sv);
 static std::string UrlEncode(const std::string &input);
 
 static std::string UrlDecode(const std::string &input);
+
+#if HAVE_STATX
+static void TimeSpec2StatxTS(const timespec& ts, struct statx_timestamp& out);
+static void Stat2Statx(const struct stat *, struct statx *, unsigned int mask = 0);
+#endif
 
     XrdOucUtils() {}
     ~XrdOucUtils() {}

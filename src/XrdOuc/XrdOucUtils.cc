@@ -36,6 +36,7 @@
 #include <unordered_set>
 #include <algorithm>
 #include <charconv>
+#include <sys/sysmacros.h>
 
 #include <regex.h>
 
@@ -1313,6 +1314,90 @@ int XrdOucUtils::Token(const char **str, char delim, char *buff, int bsz)
 //
    return aLen;
 }
+
+#if HAVE_STATX
+void XrdOucUtils::TimeSpec2StatxTS(const timespec& ts, struct statx_timestamp& out) {
+   out.tv_sec  = ts.tv_sec;
+   out.tv_nsec = ts.tv_nsec;
+}
+
+void XrdOucUtils::Stat2Statx(const struct stat* in, struct statx* out, unsigned int mask)
+{
+  if (!in || !out) return;
+
+  std::memset(out, 0, sizeof(*out));
+
+  // Common convention: mask==0 => fill "basic stats".
+  if (mask == 0) mask = STATX_BASIC_STATS;
+
+  out->stx_mask = 0;
+
+  // MODE / TYPE
+  if (mask & (STATX_MODE | STATX_TYPE)) {
+     out->stx_mode = 0;
+     if (mask & STATX_TYPE) out->stx_mode |= (in->st_mode & S_IFMT);
+     if (mask & STATX_MODE) out->stx_mode |= (in->st_mode & ~S_IFMT);
+
+
+    if (mask & STATX_MODE) out->stx_mask |= STATX_MODE;
+    if (mask & STATX_TYPE) out->stx_mask |= STATX_TYPE;
+  }
+
+  if (mask & STATX_NLINK) {
+    out->stx_nlink = static_cast<unsigned int>(in->st_nlink);
+    out->stx_mask |= STATX_NLINK;
+  }
+
+  if (mask & STATX_UID) {
+    out->stx_uid = static_cast<unsigned int>(in->st_uid);
+    out->stx_mask |= STATX_UID;
+  }
+
+  if (mask & STATX_GID) {
+    out->stx_gid = static_cast<unsigned int>(in->st_gid);
+    out->stx_mask |= STATX_GID;
+  }
+
+  if (mask & STATX_INO) {
+    out->stx_ino = static_cast<unsigned long long>(in->st_ino);
+    out->stx_mask |= STATX_INO;
+  }
+
+  if (mask & STATX_SIZE) {
+    out->stx_size = static_cast<unsigned long long>(in->st_size);
+    out->stx_mask |= STATX_SIZE;
+  }
+
+  if (mask & STATX_BLOCKS) {
+    out->stx_blocks = static_cast<unsigned long long>(in->st_blocks);
+    out->stx_mask |= STATX_BLOCKS;
+  }
+
+  // Not governed by a STATX_* bit, but useful and present on Linux.
+  out->stx_blksize = static_cast<unsigned int>(in->st_blksize);
+
+  if (mask & STATX_ATIME) {
+    TimeSpec2StatxTS(in->st_atim,out->stx_atime);
+    out->stx_mask |= STATX_ATIME;
+  }
+
+  if (mask & STATX_MTIME) {
+     TimeSpec2StatxTS(in->st_mtim,out->stx_mtime);
+     out->stx_mask |= STATX_MTIME;
+  }
+
+  if (mask & STATX_CTIME) {
+    TimeSpec2StatxTS(in->st_ctim,out->stx_ctime);
+    out->stx_mask |= STATX_CTIME;
+  }
+
+  // Device IDs split into major/minor in statx.
+  out->stx_dev_major  = static_cast<unsigned int>(major(in->st_dev));
+  out->stx_dev_minor  = static_cast<unsigned int>(minor(in->st_dev));
+  out->stx_rdev_major = static_cast<unsigned int>(major(in->st_rdev));
+  out->stx_rdev_minor = static_cast<unsigned int>(minor(in->st_rdev));
+}
+#endif
 
 /******************************************************************************/
 /*                            U n d e r c o v e r                             */

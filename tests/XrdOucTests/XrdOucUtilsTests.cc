@@ -3,11 +3,15 @@
 #include "XrdOuc/XrdOucUtils.hh"
 #include "XrdOuc/XrdOucTUtils.hh"
 #include "XrdOuc/XrdOucPrivateUtils.hh"
+#include "XrdSys/XrdSysPlatform.hh"
 
 #include <map>
 #include <string>
 
 #include <gtest/gtest.h>
+#if HAVE_STATX
+#include <sys/sysmacros.h>
+#endif
 
 class XrdOucUtilsTests : public ::testing::Test {};
 
@@ -329,3 +333,139 @@ TEST(XrdOucUtilsTests, genHumanSizeTest) {
     ASSERT_EQ(sizeToHuman.second,XrdOucUtils::genHumanSize(sizeToHuman.first,1024));
   }
 }
+
+#if HAVE_STATX
+
+static struct stat MakeStat()
+{
+  struct stat st;
+  std::memset(&st, 0, sizeof(st));
+
+  st.st_mode   = S_IFREG | 0644;
+  st.st_nlink  = 3;
+  st.st_uid    = 1001;
+  st.st_gid    = 1002;
+  st.st_ino    = 0x1122334455667788ULL;
+  st.st_size   = 0xAABBCCDDEEFF0011LL;
+  st.st_blocks = 12345;
+  st.st_blksize = 4096;
+
+  st.st_atim.tv_sec  = 10;  st.st_atim.tv_nsec  = 11;
+  st.st_mtim.tv_sec  = 20;  st.st_mtim.tv_nsec  = 21;
+  st.st_ctim.tv_sec  = 30;  st.st_ctim.tv_nsec  = 31;
+
+  st.st_dev  = makedev(8, 1);
+  st.st_rdev = makedev(9, 2);
+
+  return st;
+}
+
+TEST(XrdOucUtilsTests, NullPointersAreNoOp)
+{
+  // Should not crash.
+  struct statx out;
+  std::memset(&out, 0xAB, sizeof(out));
+  XrdOucUtils::Stat2Statx(nullptr, &out, STATX_BASIC_STATS);
+
+  struct stat in = MakeStat();
+  XrdOucUtils::Stat2Statx(&in, nullptr, STATX_BASIC_STATS);
+}
+
+TEST(Stat2Statx, MaskZeroMeansBasicStats)
+{
+  struct stat in = MakeStat();
+  struct statx out;
+  std::memset(&out, 0, sizeof(out));
+
+  XrdOucUtils::Stat2Statx(&in, &out, 0);
+
+  // Basic stats should be marked valid. Note: my implementation may also set TYPE together with MODE.
+  EXPECT_TRUE(out.stx_mask & STATX_MODE);
+  EXPECT_TRUE(out.stx_mask & STATX_NLINK);
+  EXPECT_TRUE(out.stx_mask & STATX_UID);
+  EXPECT_TRUE(out.stx_mask & STATX_GID);
+  EXPECT_TRUE(out.stx_mask & STATX_INO);
+  EXPECT_TRUE(out.stx_mask & STATX_SIZE);
+  EXPECT_TRUE(out.stx_mask & STATX_BLOCKS);
+  EXPECT_TRUE(out.stx_mask & STATX_ATIME);
+  EXPECT_TRUE(out.stx_mask & STATX_MTIME);
+  EXPECT_TRUE(out.stx_mask & STATX_CTIME);
+
+  EXPECT_EQ(out.stx_mode, static_cast<unsigned short>(in.st_mode));
+  EXPECT_EQ(out.stx_nlink, static_cast<unsigned int>(in.st_nlink));
+  EXPECT_EQ(out.stx_uid, static_cast<unsigned int>(in.st_uid));
+  EXPECT_EQ(out.stx_gid, static_cast<unsigned int>(in.st_gid));
+  EXPECT_EQ(out.stx_ino, static_cast<unsigned long long>(in.st_ino));
+  EXPECT_EQ(out.stx_size, static_cast<unsigned long long>(in.st_size));
+  EXPECT_EQ(out.stx_blocks, static_cast<unsigned long long>(in.st_blocks));
+
+  EXPECT_EQ(out.stx_atime.tv_sec,  in.st_atim.tv_sec);
+  EXPECT_EQ(out.stx_atime.tv_nsec, in.st_atim.tv_nsec);
+  EXPECT_EQ(out.stx_mtime.tv_sec,  in.st_mtim.tv_sec);
+  EXPECT_EQ(out.stx_mtime.tv_nsec, in.st_mtim.tv_nsec);
+  EXPECT_EQ(out.stx_ctime.tv_sec,  in.st_ctim.tv_sec);
+  EXPECT_EQ(out.stx_ctime.tv_nsec, in.st_ctim.tv_nsec);
+
+  EXPECT_EQ(out.stx_blksize, static_cast<unsigned int>(in.st_blksize));
+
+  EXPECT_EQ(out.stx_dev_major,  static_cast<unsigned int>(major(in.st_dev)));
+  EXPECT_EQ(out.stx_dev_minor,  static_cast<unsigned int>(minor(in.st_dev)));
+  EXPECT_EQ(out.stx_rdev_major, static_cast<unsigned int>(major(in.st_rdev)));
+  EXPECT_EQ(out.stx_rdev_minor, static_cast<unsigned int>(minor(in.st_rdev)));
+}
+
+TEST(XrdOucUtilsTests, RespectsSelectiveMaskAndLeavesOtherFieldsZero)
+{
+  struct stat in = MakeStat();
+  struct statx out;
+  std::memset(&out, 0, sizeof(out));
+
+  const unsigned int mask = STATX_SIZE | STATX_MTIME;
+  XrdOucUtils::Stat2Statx(&in, &out, mask);
+
+  EXPECT_EQ(out.stx_mask, mask) << "Expected stx_mask to contain only requested bits.";
+
+  // Requested fields
+  EXPECT_EQ(out.stx_size, static_cast<unsigned long long>(in.st_size));
+  EXPECT_EQ(out.stx_mtime.tv_sec,  in.st_mtim.tv_sec);
+  EXPECT_EQ(out.stx_mtime.tv_nsec, in.st_mtim.tv_nsec);
+
+  // Not requested => should remain zero (because Stat2Statx memset(out,0) then selectively fills)
+  EXPECT_EQ(out.stx_ino, 0ULL);
+  EXPECT_EQ(out.stx_uid, 0U);
+  EXPECT_EQ(out.stx_gid, 0U);
+  EXPECT_EQ(out.stx_nlink, 0U);
+  EXPECT_EQ(out.stx_blocks, 0ULL);
+  EXPECT_EQ(out.stx_mode, 0U);
+
+  EXPECT_EQ(out.stx_atime.tv_sec, 0LL);
+  EXPECT_EQ(out.stx_atime.tv_nsec, 0U);
+  EXPECT_EQ(out.stx_ctime.tv_sec, 0LL);
+  EXPECT_EQ(out.stx_ctime.tv_nsec, 0U);
+
+  // These are not governed by STATX_* bits in your implementation (they'll be populated anyway).
+  // If you later decide to gate them too, adjust these expectations.
+  EXPECT_EQ(out.stx_blksize, static_cast<unsigned int>(in.st_blksize));
+  EXPECT_EQ(out.stx_dev_major,  static_cast<unsigned int>(major(in.st_dev)));
+  EXPECT_EQ(out.stx_dev_minor,  static_cast<unsigned int>(minor(in.st_dev)));
+  EXPECT_EQ(out.stx_rdev_major, static_cast<unsigned int>(major(in.st_rdev)));
+  EXPECT_EQ(out.stx_rdev_minor, static_cast<unsigned int>(minor(in.st_rdev)));
+}
+
+TEST(XrdOucUtilsTests, TypeOnlySetsTypeBitAndPopulatesModeStorage)
+{
+  struct stat in = MakeStat();
+  struct statx out;
+  std::memset(&out, 0, sizeof(out));
+
+  XrdOucUtils::Stat2Statx(&in, &out, STATX_TYPE);
+
+  // Your implementation sets stx_mode when TYPE is requested (because type comes from st_mode)
+  EXPECT_TRUE(out.stx_mask & STATX_TYPE);
+  EXPECT_FALSE(out.stx_mask & STATX_MODE) << "TYPE-only request should not imply MODE bit unless the implementation choose otherwise.";
+
+  EXPECT_EQ(out.stx_mode, static_cast<unsigned short>(in.st_mode & S_IFMT))
+      << "Even for TYPE-only, stx_mode must be set so consumers can read S_IFMT bits.";
+}
+
+#endif

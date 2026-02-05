@@ -42,6 +42,8 @@
 #include "XrdOuc/XrdOucSFVec.hh"
 
 #include "XrdSfs/XrdSfsGPFile.hh"
+#include "XrdSys/XrdSysPlatform.hh"
+#include "XrdOuc/XrdOucUtils.hh"
 
 #include "XrdSys/XrdSysPageSize.hh"
 
@@ -749,6 +751,17 @@ virtual XrdSfsXferSize writev(XrdOucIOVec      *writeV,
 //-----------------------------------------------------------------------------
 
 virtual int            stat(struct stat *buf) = 0;
+
+#if HAVE_STATX
+virtual int statx(struct statx *buf,unsigned int mask) {
+  struct stat statbuf;
+  int res = stat(&statbuf);
+  if (res == SFS_OK) {
+    XrdOucUtils::Stat2Statx(&statbuf,buf,mask);
+  }
+  return res;
+}
+#endif
 
 //-----------------------------------------------------------------------------
 //! Make sure all outstanding data is actually written to the file (sync).

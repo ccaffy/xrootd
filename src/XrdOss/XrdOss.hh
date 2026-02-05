@@ -43,6 +43,8 @@
 
 #include "XrdOss/XrdOssVS.hh"
 #include "XrdOuc/XrdOucIOVec.hh"
+#include "XrdSys/XrdSysPlatform.hh"
+#include "XrdOuc/XrdOucUtils.hh"
 
 struct XrdOucCloneSeg;
 class XrdOucEnv;
@@ -161,6 +163,24 @@ virtual void    Flush() {}
 //-----------------------------------------------------------------------------
 
 virtual int     Fstat(struct stat *buf) {return -EISDIR;}
+
+#if HAVE_STATX
+//-----------------------------------------------------------------------------
+//! Return state information for this file.
+//!
+//! @param  buf    - Pointer to the structure where info it to be returned.
+//!
+//! @return 0 upon success or -errno or -osserr (see XrdOssError.hh).
+//-----------------------------------------------------------------------------
+virtual int Statx(struct statx * buf, unsigned int mask) {
+  struct stat bufstat;
+  int res = Fstat(&bufstat);
+  if (!res) {
+    XrdOucUtils::Stat2Statx(&bufstat,buf,mask);
+  }
+  return res;
+}
+#endif
 
 //-----------------------------------------------------------------------------
 //! Synchronize associated file with media (synchronous).
@@ -762,6 +782,16 @@ virtual int       Rename(const char *oPath, const char *nPath,
 
 virtual int       Stat(const char *path, struct stat *buff,
                        int opts=0, XrdOucEnv *envP=0)=0;
+
+virtual int       Statx(const char *path, struct statx *buff, unsigned int mask = 0,
+                       int opts=0, XrdOucEnv *envP=0) {
+  struct stat statbuff;
+  int res = Stat(path,&statbuff,opts,envP);
+  if (!res) {
+    XrdOucUtils::Stat2Statx(&statbuff,buff,mask);
+  }
+  return res;
+}
 
 //-----------------------------------------------------------------------------
 //! Return statistics.

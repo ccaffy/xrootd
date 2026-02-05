@@ -104,6 +104,9 @@ int     Fchmod(mode_t mode);
 int     Fctl(int cmd, int alen, const char *args, char **resp=0);
 void    Flush();
 int     Fstat(struct stat *);
+#if HAVE_STATX
+int     Statx(struct statx*, unsigned int);
+#endif
 int     Fsync();
 int     Fsync(XrdSfsAio *aiop);
 int     Ftruncate(unsigned long long);

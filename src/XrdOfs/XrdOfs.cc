@@ -1711,6 +1711,35 @@ int XrdOfsFile::stat(struct stat     *buf)         // Out
    return SFS_OK;
 }
 
+#if HAVE_STATX
+/******************************************************************************/
+/*                                  s t a t x                                 */
+/******************************************************************************/
+int XrdOfsFile::statx(struct statx     *buf, unsigned int mask)         // Out
+/*
+  Function: Return file status information
+
+  Input:    buf         - The stat structiure to hold the results
+
+  Output:   Returns SFS_OK upon success and SFS_ERROR upon failure.
+*/
+{
+   EPNAME("fstat");
+   int retc;
+
+   // Perform any required tracing
+   //
+   FTRACE(stat, "");
+
+   // Perform the function
+   //
+   if ((retc = oh->Select().Statx(buf,mask)) < 0)
+      return XrdOfsFS->Emsg(epname,error,retc,"get statx for",oh);
+
+   return SFS_OK;
+}
+#endif
+
 /******************************************************************************/
 /*                                  s y n c                                   */
 /******************************************************************************/

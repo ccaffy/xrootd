@@ -187,6 +187,9 @@ public:
         int            sync(XrdSfsAio *aiop);
 
         int            stat(struct stat *buf);
+#if HAVE_STATX
+        int            statx(struct statx *buf, unsigned int mask);
+#endif
 
         int            truncate(XrdSfsFileOffset   fileOffset);
 

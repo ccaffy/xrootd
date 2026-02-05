@@ -43,6 +43,15 @@
 #define MAXNAMELEN NAME_MAX
 #endif
 
+#ifdef __linux__
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/syscall.h>
+#ifdef AT_STATX_SYNC_AS_STAT
+  #define HAVE_STATX 1
+#endif
+#endif
+
 #ifdef __APPLE__
 #include <AvailabilityMacros.h>
 #include <sys/types.h>
