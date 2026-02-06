@@ -1,4 +1,5 @@
-
+#ifndef XRD_HTTP_TPC_TPC_HH
+#define XRD_HTTP_TPC_TPC_HH
 #include <memory>
 #include <string>
 #include <vector>
@@ -196,3 +197,4 @@ private:
     std::map<std::string,std::string> hdr2cgimap;
 };
 }
+#endif
