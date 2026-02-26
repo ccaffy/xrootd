@@ -5,6 +5,7 @@
 #include "XrdHttp/XrdHttpChecksumHandler.hh"
 #include "XrdHttp/XrdHttpReadRangeHandler.hh"
 #include "XrdHttp/XrdHttpHeaderUtils.hh"
+#include "XrdHttp/XrdHttpUtils.hh"
 #include "XrdHttpCors/XrdHttpCorsHandler.hh"
 #include <exception>
 #include <gtest/gtest.h>
@@ -760,5 +761,101 @@ TEST(XrdHttpTests, base64DecodeEncodeHex) {
     Fromhexdigest(output,bytes);
     Tobase64(bytes,output);
     ASSERT_EQ(b64ToH.first,output);
+  }
+}
+
+struct ParseURLTestCase {
+  std::string url;
+  bool        expectSuccess;
+  std::string expectedHost; // only checked when expectSuccess == true
+  int         expectedPort; // only checked when expectSuccess == true
+  std::string expectedPath; // only checked when expectSuccess == true
+};
+
+static const ParseURLTestCase parseURLTestCases[] = {
+  // ---- Success cases ----
+  // Standard HTTP URL with host, port, and path
+  {"http://example.com:8080/path/to/file",              true,  "example.com",        8080, "/path/to/file"            },
+  // URL without port (port field is 0)
+  {"http://example.com/path",                           true,  "example.com",           0, "/path"                    },
+  // HTTPS URL
+  {"https://secure.example.com:443/secure/path",        true,  "secure.example.com",  443, "/secure/path"             },
+  // root:// protocol URL
+  {"root://xrootd.example.com:1094/store/data",         true,  "xrootd.example.com", 1094, "/store/data"              },
+  // davs:// URL
+  {"davs://dav.example.com:443/remote/file",            true,  "dav.example.com",     443, "/remote/file"             },
+  // URL with only root path
+  {"http://example.com:80/",                            true,  "example.com",          80, "/"                        },
+  // URL without port, root path only
+  {"http://example.com/",                               true,  "example.com",           0, "/"                        },
+  // URL with IPv4 address and port
+  {"http://192.168.1.1:8080/data",                      true,  "192.168.1.1",        8080, "/data"                    },
+  // URL with IPv4 address, no port
+  {"http://10.0.0.1/data",                              true,  "10.0.0.1",              0, "/data"                    },
+  // URL with deep path
+  {"http://host:1234/a/b/c/d/e",                        true,  "host",               1234, "/a/b/c/d/e"               },
+  // URL with query string (query is part of the path component)
+  {"http://example.com:8080/path?query=value&key=val",  true,  "example.com",        8080, "/path?query=value&key=val" },
+  // URL with opaque / percent-encoded data in the query
+  {"http://example.com:1094/path?authz=Bearer%20token", true,  "example.com",        1094, "/path?authz=Bearer%20token"},
+  // Explicit port 0 is valid
+  {"http://host:0/path",                                true,  "host",                  0, "/path"                    },
+  // Maximum valid port number
+  {"http://host:65535/path",                            true,  "host",              65535, "/path"                    },
+  // Protocol-relative (scheme-less) URL
+  {"//host/path",                                       true,  "host",                  0, "/path"                    },
+  // URL with a fragment (fragment is part of the path component)
+  {"http://example.com:8080/path#fragment",             true,  "example.com",        8080, "/path#fragment"           },
+  // Empty host with valid path (http:///path)
+  {"http:///path",                                      true,  "",                      0, "/path"                    },
+  // ---- IPv6 literal addresses ----
+  // IPv6 with port
+  {"http://[::1]:8080/path",                            true,  "::1",                8080, "/path"                    },
+  // IPv6 without port
+  {"http://[::1]/path",                                 true,  "::1",                   0, "/path"                    },
+  // Full IPv6 address with port
+  {"http://[2001:db8::1]:80/path",                      true,  "2001:db8::1",          80, "/path"                    },
+  // ---- Error cases ----
+  // No "//" separator
+  {"example.com/path",                                  false, "", 0, ""},
+  // No path after host (missing trailing slash)
+  {"http://example.com",                                false, "", 0, ""},
+  // No path after host:port (missing trailing slash)
+  {"http://example.com:8080",                           false, "", 0, ""},
+  // Empty string
+  {"",                                                  false, "", 0, ""},
+  // Authority present but no path
+  {"//host",                                            false, "", 0, ""},
+  // Scheme with empty authority and no path
+  {"http://",                                           false, "", 0, ""},
+  // Non-numeric port (previously silently treated as 0; now an error)
+  {"http://host:abc/path",                              false, "", 0, ""},
+  // Negative port (previously silently accepted; now an error)
+  {"http://host:-1/path",                               false, "", 0, ""},
+  // Port with trailing non-digit garbage (previously silently truncated; now an error)
+  {"http://host:8080abc/path",                          false, "", 0, ""},
+  // Port out of range (> 65535)
+  {"http://host:65536/path",                            false, "", 0, ""},
+  // Empty port string after the colon
+  {"http://host:/path",                                 false, "", 0, ""},
+  // IPv6 with unclosed bracket
+  {"http://[::1:8080/path",                             false, "", 0, ""},
+  // IPv6 with non-numeric port
+  {"http://[::1]:abc/path",                             false, "", 0, ""},
+  // IPv6 with port out of range
+  {"http://[::1]:65536/path",                           false, "", 0, ""},
+};
+
+TEST(XrdHttpTests, parseURLTests) {
+  for (const auto& tc : parseURLTestCases) {
+    const auto result = parseURL(tc.url);
+    if (tc.expectSuccess) {
+      ASSERT_TRUE(result.has_value())              << "URL: " << tc.url;
+      ASSERT_EQ(tc.expectedHost, result->host)     << "URL: " << tc.url;
+      ASSERT_EQ(tc.expectedPort, result->port)     << "URL: " << tc.url;
+      ASSERT_EQ(tc.expectedPath, result->path)     << "URL: " << tc.url;
+    } else {
+      ASSERT_FALSE(result.has_value())             << "URL: " << tc.url;
+    }
   }
 }

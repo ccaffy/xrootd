@@ -39,6 +39,7 @@
 
 #include "XrdHttpUtils.hh"
 
+#include <charconv>
 #include <cstring>
 #include <openssl/hmac.h>
 #include <openssl/bio.h>
@@ -55,48 +56,62 @@
 #include "XrdSec/XrdSecEntity.hh"
 #include "XrdOuc/XrdOucString.hh"
 
-// GetHost from URL
-// Parse an URL and extract the host name and port
-// Return 0 if OK
-int parseURL(char *url, char *host, int &port, char **path) {
-  // http://x.y.z.w:p/path
+std::optional<ParsedURL> parseURL(std::string_view url) {
+  // Locate the "//" that separates the scheme from the authority.
+  const auto slashSlash = url.find("//");
+  if (slashSlash == std::string_view::npos) return std::nullopt;
 
-  *path = 0;
+  // Everything after "//".
+  const std::string_view rest = url.substr(slashSlash + 2);
 
-  // look for the second slash
-  char *p = strstr(url, "//");
-  if (!p) return -1;
+  // The authority ends at the first '/' that begins the path.
+  const auto pathStart = rest.find('/');
+  if (pathStart == std::string_view::npos) return std::nullopt;
 
+  const std::string_view authority = rest.substr(0, pathStart);
+  const std::string_view path      = rest.substr(pathStart);
 
-  p += 2;
+  ParsedURL result;
+  result.path = std::string(path);
 
-  // look for the end of the host:port
-  char *p2 = strchr(p, '/');
-  if (!p2) return -1;
+  // Helper: parse a decimal port string and validate its range.
+  auto parsePort = [](std::string_view portStr, int &out) -> bool {
+    if (portStr.empty()) return false;
+    int value = 0;
+    const auto [ptr, ec] = std::from_chars(portStr.data(),
+                                           portStr.data() + portStr.size(),
+                                           value);
+    if (ec != std::errc{} || ptr != portStr.data() + portStr.size()) return false;
+    if (value < 0 || value > 65535) return false;
+    out = value;
+    return true;
+  };
 
-  *path = p2;
+  if (!authority.empty() && authority[0] == '[') {
+    // IPv6 literal: [<addr>] or [<addr>]:<port>
+    const auto closeBracket = authority.find(']');
+    if (closeBracket == std::string_view::npos) return std::nullopt;
 
-  char buf[256];
-  int l = std::min((int)(p2 - p), (int)sizeof (buf) - 1);
-  strncpy(buf, p, l);
-  buf[l] = '\0';
+    result.host = std::string(authority.substr(1, closeBracket - 1));
 
-  // Now look for :
-  p = strchr(buf, ':');
-  if (p) {
-    int l = std::min((int)(p - buf), (int)sizeof (buf) - 1);
-    strncpy(host, buf, l);
-    host[l] = '\0';
-
-    port = atoi(p + 1);
+    const std::string_view afterBracket = authority.substr(closeBracket + 1);
+    if (!afterBracket.empty()) {
+      // Must be ":<port>"
+      if (afterBracket[0] != ':') return std::nullopt;
+      if (!parsePort(afterBracket.substr(1), result.port)) return std::nullopt;
+    }
   } else {
-    port = 0;
-
-
-    strcpy(host, buf);
+    // Regular host (hostname or IPv4): split on the first ':'.
+    const auto colon = authority.find(':');
+    if (colon != std::string_view::npos) {
+      result.host = std::string(authority.substr(0, colon));
+      if (!parsePort(authority.substr(colon + 1), result.port)) return std::nullopt;
+    } else {
+      result.host = std::string(authority);
+    }
   }
 
-  return 0;
+  return result;
 }
 
 

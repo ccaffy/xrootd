@@ -1653,34 +1653,27 @@ int XrdHttpReq::ProcessHTTPReq() {
       std::string s = resourceplusopaque.c_str();
       s += " ";
 
-      char buf[256];
-      char *ppath;
-      int port = 0;
-      if (parseURL((char *) destination.c_str(), buf, port, &ppath)) {
+      auto parsedDest = parseURL(destination);
+      if (!parsedDest) {
         prot->SendSimpleResp(501, NULL, NULL, (char *) "Cannot parse destination url.", 0, false);
         return -1;
       }
 
-      char buf2[256];
-      strncpy(buf2, host.c_str(), sizeof(buf2) - 1);
-      buf2[sizeof(buf2) - 1] = '\0';
-      char *pos = strchr(buf2, ':');
-      if (pos) *pos = '\0';
-     
+      // Strip the optional ":port" suffix from the local server host string
+      // so that we can compare just the hostname.
+      std::string localHost = host.substr(0, host.find(':'));
+
       // If we are a redirector we enforce that the host field is equal to
       // whatever was written in the destination url
       //
       // If we are a data server instead we cannot enforce anything, we will
       // just ignore the host part of the destination
-      if ((prot->myRole == kXR_isManager) && strcmp(buf, buf2)) {
+      if ((prot->myRole == kXR_isManager) && parsedDest->host != localHost) {
         prot->SendSimpleResp(501, NULL, NULL, (char *) "Only in-place renaming is supported for MOVE.", 0, false);
         return -1;
       }
 
-
-
-
-      s += ppath;
+      s += parsedDest->path;
 
       l = s.length() + 1;
       xrdreq.mv.dlen = htonl(l);

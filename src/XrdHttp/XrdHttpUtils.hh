@@ -43,6 +43,8 @@
 #include "XrdOuc/XrdOucIOVec.hh"
 #include "XrdOuc/XrdOucTUtils.hh"
 #include <string>
+#include <string_view>
+#include <optional>
 #include <cstring>
 #include <vector>
 #include <memory>
@@ -122,10 +124,18 @@ enum : int {
   HTTP_NETWORK_AUTHENTICATION_REQUIRED = 511,
 };
 
-// GetHost from URL
-// Parse an URL and extract the host name and port
-// Return 0 if OK
-int parseURL(char *url, char *host, int &port, char **path);
+// Parsed result of parseURL.
+struct ParsedURL {
+  std::string host; // hostname or bare IPv6 address (without brackets)
+  int         port = 0; // 0 when no port is present in the URL
+  std::string path; // path component, always starts with '/'
+};
+
+// Parse a URL of the form [scheme://]host[:port]/path and return its
+// components.  Returns std::nullopt when the URL is malformed, when the
+// authority section is missing or when the port is present but is not a
+// pure decimal integer in [0, 65535].
+std::optional<ParsedURL> parseURL(std::string_view url);
 
 // Simple itoa function
 std::string itos(long i);
