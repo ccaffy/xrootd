@@ -22,6 +22,7 @@
 #include "XrdCl/XrdClConstants.hh"
 #include "XrdCl/XrdClUtils.hh"
 #include <cstdlib>
+#include <map>
 
 namespace XrdCl
 {
@@ -109,8 +110,8 @@ namespace XrdCl
   struct StatInfoImpl
   {
       StatInfoImpl() : pSize( 0 ), pFlags( 0 ), pModifyTime( 0 ),
-                       pChangeTime( 0 ), pAccessTime( 0 ),
-                       pExtended( false ), pHasCksum( false )
+                       pChangeTime( 0 ), pAccessTime( 0 ),pBirthTime(0),
+                       pExtended( false ), pHasCksum( false ),pHasBirthTime( false )
       {
       }
 
@@ -120,11 +121,13 @@ namespace XrdCl
                                                    pModifyTime( pimpl.pModifyTime ),
                                                    pChangeTime( pimpl.pChangeTime ),
                                                    pAccessTime( pimpl.pAccessTime ),
+                                                   pBirthTime(pimpl.pBirthTime),
                                                    pMode( pimpl.pMode ),
                                                    pOwner( pimpl.pOwner ),
                                                    pGroup( pimpl.pGroup ),
                                                    pExtended( pimpl.pExtended ),
-                                                   pHasCksum( pimpl.pHasCksum )
+                                                   pHasCksum( pimpl.pHasCksum ),
+                                                   pHasBirthTime(pimpl.pHasBirthTime)
       {
       }
 
@@ -202,6 +205,44 @@ namespace XrdCl
           }
         }
 
+        //----------------------------------------------------------------------
+        // The last element may contain extra key-value attributes
+        // prefixed with '\n', e.g. "\nbtime_s=0&btime_n=0"
+        //----------------------------------------------------------------------
+        const std::string &lastChunk = chunks.back();
+        if( !lastChunk.empty() && lastChunk[0] == '\n' )
+        {
+          std::string kvString = lastChunk.substr( 1 );
+
+          std::vector<std::string> kvPairs;
+          Utils::splitString( kvPairs, kvString, "&" );
+
+          std::map<std::string, std::string> extraAttrs;
+          for( const auto &kv : kvPairs )
+          {
+            size_t eqPos = kv.find( '=' );
+            if( eqPos != std::string::npos )
+            {
+              std::string key   = kv.substr( 0, eqPos );
+              std::string value = kv.substr( eqPos + 1 );
+              extraAttrs[key]   = value;
+            }
+          }
+
+          if( extraAttrs.find( "btime_s" ) != extraAttrs.end() )
+          {
+            // We only take the birthtime in seconds to match what is done with access time and the rest
+            // if we need the nanoseconds for birth time, one can extract btime_n.
+            pBirthTime = ::strtoll( extraAttrs["btime_s"].c_str(), &result, 0 );
+            if( *result != 0 )
+            {
+              pBirthTime = 0;
+              return false;
+            }
+            pHasBirthTime = true;
+          }
+        }
+
         return true;
       }
 
@@ -211,12 +252,14 @@ namespace XrdCl
       uint64_t    pModifyTime;
       uint64_t    pChangeTime;
       uint64_t    pAccessTime;
+      uint64_t    pBirthTime;
       std::string pMode;
       std::string pOwner;
       std::string pGroup;
 
       bool        pExtended;
       bool        pHasCksum;
+      bool        pHasBirthTime;
       std::string pCksum;
   };
 
@@ -354,6 +397,30 @@ namespace XrdCl
   std::string StatInfo::GetAccessTimeAsString() const
   {
     return TimeToString( pImpl->pAccessTime );
+  }
+
+  //------------------------------------------------------------------------
+  //! Get birth time (in seconds since epoch)
+  //------------------------------------------------------------------------
+  uint64_t StatInfo::GetBirthTime() const
+  {
+    return pImpl->pBirthTime;
+  }
+
+  //------------------------------------------------------------------------
+  //! Get birth time
+  //------------------------------------------------------------------------
+  std::string StatInfo::GetBirthTimeAsString() const
+  {
+    return TimeToString( pImpl->pBirthTime );
+  }
+
+  //------------------------------------------------------------------------
+  //! Has birth time
+  //------------------------------------------------------------------------
+  bool StatInfo::HasBirthTime() const
+  {
+    return pImpl->pHasBirthTime;
   }
 
   //------------------------------------------------------------------------

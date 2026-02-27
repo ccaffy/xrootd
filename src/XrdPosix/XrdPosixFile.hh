@@ -153,7 +153,7 @@ inline long long     setOffset(long long offs)
                                return offs;
                               }
 
-       bool          Stat(XrdCl::XRootDStatus &Status, bool force=false);
+       bool          Stat(XrdCl::XRootDStatus &Status, bool force=false, uint32_t wants = 0);
 
        int           Sync() override;
 
@@ -181,6 +181,7 @@ inline bool          Who(XrdPosixFile **fileP) override
        time_t        myAtime;
        time_t        myCtime;
        time_t        myMtime;
+       time_t        mBTime;
        dev_t         myRdev;
        ino_t         myInode;
        mode_t        myMode;

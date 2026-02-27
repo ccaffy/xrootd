@@ -175,6 +175,21 @@ XrdPosixLinkage Xunix;
                          {return (Retv_Rmdir)Xunix.Load_Error("rmdir");}
       Retv_Seekdir     Xrd_U_Seekdir(Args_Seekdir)
                          {       Xunix.Load_Error("seekdir"); abort();}
+#ifdef HAVE_STATX
+      Retv_Statx       Xrd_U_Statx(Args_Statx)
+                         {return (Retv_Statx)Xunix.Load_Error("statx");}
+#else
+      // For kernels without statx, we fake a normal stat
+      Retv_Statx       Xrd_U_Statx(int dirfd, const char *path,
+                                    int flags, unsigned int mask,
+                                    XrdSysStatx *stxbuf)
+                         {struct stat buf;
+                          int rc = stat(path, &buf);
+                          if (rc == 0)
+                             XrdSysStatxHelpers::Stat2Statx(buf, *stxbuf);
+                          return rc;
+                         }
+#endif
       Retv_Stat        Xrd_U_Stat(Args_Stat)
                          {return (Retv_Stat)Xunix.Load_Error("stat");}
       Retv_Stat64      Xrd_U_Stat64(Args_Stat64)
@@ -262,6 +277,11 @@ int XrdPosixLinkage::Resolve()
   LOOKUP_UNIX(Rewinddir)
   LOOKUP_UNIX(Rmdir)
   LOOKUP_UNIX(Seekdir)
+#ifdef HAVE_STATX
+  LOOKUP_UNIX(Statx)
+#else
+  Statx = Xrd_U_Statx;
+#endif
   LOOKUP_UNIX(Stat)
   LOOKUP_UNIX(Stat64)
   LOOKUP_UNIX(Statfs)

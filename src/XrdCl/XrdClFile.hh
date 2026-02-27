@@ -100,7 +100,8 @@ namespace XrdCl
                          OpenFlags::Flags   flags,
                          Access::Mode       mode,
                          ResponseHandler   *handler,
-                         time_t             timeout  = 0 )
+                         time_t             timeout  = 0,
+                         uint32_t           wants = 0)
                          XRD_WARN_UNUSED_RESULT;
 
       //------------------------------------------------------------------------
@@ -217,11 +218,13 @@ namespace XrdCl
       //!                if the procedure is successful
       //! @param timeout timeout value, if 0 the environment default will
       //!                be used
+      //! @param wants   statx stx_mask e.g: STATX_BASIC_STATS | STATX_BTIME.
       //! @return        status of the operation
       //------------------------------------------------------------------------
       XRootDStatus Stat( bool             force,
                          ResponseHandler *handler,
-                         time_t           timeout = 0 )
+                         time_t           timeout = 0,
+                         uint32_t         wants = 0)
                          XRD_WARN_UNUSED_RESULT;
 
       //------------------------------------------------------------------------
@@ -231,11 +234,13 @@ namespace XrdCl
       //! @param response the response (to be deleted by the user)
       //! @param timeout  timeout value, if 0 the environment default will
       //!                 be used
+      //! @param wants   statx stx_mask e.g: STATX_BASIC_STATS | STATX_BTIME.
       //! @return         status of the operation
       //------------------------------------------------------------------------
       XRootDStatus Stat( bool       force,
                          StatInfo *&response,
-                         time_t     timeout = 0 )
+                         time_t     timeout = 0,
+                         uint32_t   wants = 0)
                          XRD_WARN_UNUSED_RESULT;
 
 

@@ -111,7 +111,9 @@ namespace XrdCl
       IntentDirList = kXR_4dirlist, //!< Make sure the server knows we are doing
                                     //!< locate in context of a dir list operation
       Dup      = kXR_dup<<16,       //!< Open file duplicating content from another
-      Samefs   = kXR_samefs<<16     //!< Open file on the same filesystem as another
+      Samefs   = kXR_samefs<<16,    //!< Open file on the same filesystem as another
+      RetStatx = kXR_retstatx<<16   //!< Want statx information
+
     };
   };
   XRDOUC_ENUM_OPERATORS( OpenFlags::Flags )
@@ -534,11 +536,13 @@ namespace XrdCl
       //!                if the procedure is successful
       //! @param timeout timeout value, if 0 the environment default will
       //!                be used
+      //! @param wants   statx stx_mask e.g: STATX_BASIC_STATS | STATX_BTIME.
       //! @return        status of the operation
       //------------------------------------------------------------------------
       XRootDStatus Stat( const std::string &path,
                          ResponseHandler   *handler,
-                         time_t             timeout = 0 )
+                         time_t             timeout = 0,
+                         uint32_t           wants = 0)
                          XRD_WARN_UNUSED_RESULT;
 
       //------------------------------------------------------------------------
@@ -549,11 +553,13 @@ namespace XrdCl
       //!                 procedure is successful)
       //! @param timeout  timeout value, if 0 the environment default will
       //!                 be used
+      //! @param wants   statx stx_mask e.g: STATX_BASIC_STATS | STATX_BTIME.
       //! @return         status of the operation
       //------------------------------------------------------------------------
       XRootDStatus Stat( const std::string  &path,
                          StatInfo          *&response,
-                         time_t              timeout = 0 )
+                         time_t              timeout = 0 ,
+                         uint32_t            wants = 0)
                          XRD_WARN_UNUSED_RESULT;
 
       //------------------------------------------------------------------------
@@ -622,12 +628,14 @@ namespace XrdCl
       //!                object if the procedure is successful
       //! @param timeout timeout value, if 0 the environment default will
       //!                be used
+      //! @param wants   statx stx_mask e.g: STATX_BASIC_STATS | STATX_BTIME.
       //! @return        status of the operation
       //------------------------------------------------------------------------
       XRootDStatus DirList( const std::string   &path,
                             DirListFlags::Flags  flags,
                             ResponseHandler     *handler,
-                            time_t               timeout = 0 )
+                            time_t               timeout = 0,
+                            uint32_t             wants = 0)
                             XRD_WARN_UNUSED_RESULT;
 
       //------------------------------------------------------------------------

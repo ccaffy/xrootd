@@ -3145,6 +3145,9 @@ namespace XrdCl
           if( sreq->options & kXR_vfs )
             o << "kXR_vfs";
         }
+        if (sreq->wants) {
+          o << ", wants: " << sreq->wants;
+        }
         o << ")";
         break;
       }

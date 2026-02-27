@@ -1545,9 +1545,11 @@ namespace XrdCl
   //----------------------------------------------------------------------------
   XRootDStatus FileSystem::Stat( const std::string &path,
                                  ResponseHandler   *handler,
-                                 time_t             timeout )
+                                 time_t             timeout,
+                                 uint32_t           wants)
   {
     if( pPlugIn )
+      // @abh3 Should I modify the plugin as well? The FilesystemPlugin has no default value for the parameters...
       return pPlugIn->Stat( path, handler, timeout );
 
     if( pImpl->fsdata->pUrl->IsLocalFile() )
@@ -1561,6 +1563,7 @@ namespace XrdCl
 
     req->requestid  = kXR_stat;
     req->options    = 0;
+    req->wants      = wants;
     req->dlen       = fPath.length();
     msg->Append( fPath.c_str(), fPath.length(), 24 );
     MessageSendParams params; params.timeout = timeout;
@@ -1575,10 +1578,11 @@ namespace XrdCl
   //----------------------------------------------------------------------------
   XRootDStatus FileSystem::Stat( const std::string  &path,
                                  StatInfo          *&response,
-                                 time_t              timeout )
+                                 time_t              timeout,
+                                 uint32_t            wants)
   {
     SyncResponseHandler handler;
-    Status st = Stat( path, &handler, timeout );
+    Status st = Stat( path, &handler, timeout, wants);
     if( !st.IsOK() )
       return st;
 
@@ -1669,9 +1673,11 @@ namespace XrdCl
   XRootDStatus FileSystem::DirList( const std::string   &path,
                                     DirListFlags::Flags  flags,
                                     ResponseHandler     *handler,
-                                    time_t               timeout )
+                                    time_t               timeout,
+                                    uint32_t             wants)
   {
     if( pPlugIn )
+      //@abh3 should I modify the plugin as well? FilesystemPlugin has no default value for the parameters...
       return pPlugIn->DirList( path, flags, handler, timeout );
 
     URL url = URL( path );
@@ -1700,6 +1706,9 @@ namespace XrdCl
 
     if( ( flags & DirListFlags::Cksm ) )
       req->options[0] = kXR_dstat | kXR_dcksm;
+
+    if ( (req->options[0] & kXR_dstat) && wants != 0 )
+      req->options[0] |= kXR_dstatx;
 
     if( flags & DirListFlags::Recursive )
       handler = new RecursiveDirListHandler( *pImpl->fsdata->pUrl, url.GetPath(), flags, handler, timeout );

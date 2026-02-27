@@ -43,6 +43,7 @@
 
 #include "XrdPosix/XrdPosixLinkage.hh"
 #include "XrdPosix/XrdPosixOsDep.hh"
+#include "XrdSys/XrdSysStatx.hh"
 
 /******************************************************************************/
 /*                      P r e - D e c l a r a t i o n s                       */
@@ -792,3 +793,20 @@ ssize_t writev(int fildes, const struct iovec *iov, int iovcnt)
    return XrdPosix_Writev(fildes, iov, iovcnt);
 }
 }
+
+/******************************************************************************/
+/*                                 s t a t x                                  */
+/******************************************************************************/
+
+#ifdef HAVE_STATX
+extern "C"
+{
+int statx(int dirfd, const char *path, int flags,
+          unsigned int mask, struct statx *stx)
+{
+   static int Init = Xunix.Init(&Init);
+
+   return XrdPosix_Statx(dirfd, path, flags, mask, stx);
+}
+}
+#endif

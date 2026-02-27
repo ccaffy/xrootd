@@ -71,6 +71,7 @@
 #include "XrdPosix/XrdPosixXrootd.hh"
 #include "XrdPosix/XrdPosixXrootdPath.hh"
 
+#include "XrdSys/XrdSysStatx.hh"
 #include "XrdSys/XrdSysTrace.hh"
 
 /******************************************************************************/
@@ -1221,7 +1222,43 @@ int XrdPosixXrootd::Stat(const char *path, struct stat *buf)
 //
    if (cacheChk) buf->st_atime = 0;
    return 0;
-}        
+}
+
+/******************************************************************************/
+/*                                S t a t x                                   */
+/******************************************************************************/
+
+int XrdPosixXrootd::Statx(const char *path, unsigned int mask, XrdSysStatx *stx)
+{
+   XrdPosixAdmin admin(path,XrdPosixGlobals::ecMsg);
+
+// Make sure the admin is OK
+//
+   if (!admin.isOK()) return -1;
+
+// Check if we can get the stat information from the cache
+//
+   if (!XrdPosixGlobals::usingEC && XrdPosixGlobals::theCache)
+      {LfnPath statX("statx", path, false);
+       if (!statX.path) return -1;
+       struct stat sbuf;
+       XrdPosixConfig::initStat(&sbuf);
+      // @abh3, do I need to add a statx support for the Cache (XrdOucCache)?
+      // I even wonder if this cache is relevant for Statx as we may
+      // not want to touch XrdPfc?
+       int rc = XrdPosixGlobals::theCache->Stat(statX.path, sbuf);
+       if (!rc)
+          {XrdSysStatxHelpers::Stat2Statx(sbuf, *stx);
+           return 0;
+          }
+       if (rc < 0) {errno = -rc; return -1;}
+      }
+
+// Issue the statx and verify that all went well
+//
+   if (!admin.Statx(mask, *stx)) return -1;
+   return 0;
+}
 
 /******************************************************************************/
 /*                                S t a t f s                                 */

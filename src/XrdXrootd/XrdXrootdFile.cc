@@ -81,14 +81,14 @@ static const unsigned long  heldMask = ~1UL;
 /******************************************************************************/
   
 XrdXrootdFile::XrdXrootdFile(const char *id, const char *path, XrdSfsFile *fp,
-                             char mode, bool async, struct stat *sP)
+                             char mode, bool async, XrdSysStatx *sP)
                             : XrdSfsp(fp), mmAddr(0), FileKey(strdup(path)),
                               FileMode(mode), AsyncMode(async),
                               aioFob(0), pgwFob(0), fhProc(0),
                               ID(id), refCount(0), syncWait(0)
 {
     static XrdSysMutex seqMutex;
-    struct stat buf;
+    XrdSysStatx buf;
     off_t mmSize;
 
 // Initialize statistical counters
@@ -116,8 +116,14 @@ XrdXrootdFile::XrdXrootdFile(const char *id, const char *path, XrdSfsFile *fp,
 //
    if (sP || !isMMapped)
       {if (!sP) sP = &buf;
-       fp->stat(sP);
-       if (!isMMapped) Stats.fSize = static_cast<long long>(sP->st_size);
+       // @abh3, should I add the flag to the constructor here?
+       // For open we can just ask to get extra information
+       // but there's is no such thing as "wants" nor "mask"
+       // or should I add back the struct stat * as parameter and fill
+       // either the statx buffer or the stat one depending on the option passed?
+       // For perf reason, I would guess we want to call statx only if it was requested...
+       fp->stat(sP,STATX_BASIC_STATS | STATX_BTIME);
+       if (!isMMapped) Stats.fSize = static_cast<long long>(XrdSysStatxHelpers::GetSize(*sP));
       }
 }
   

@@ -781,7 +781,8 @@ namespace XrdCl
                                        OpenFlags::Flags                   flags,
                                        uint16_t                           mode,
                                        ResponseHandler                   *handler,
-                                       time_t                             timeout )
+                                       time_t                             timeout,
+                                       uint32_t                           wants)
   {
     self->pTemplateFileWp.reset();
     return OpenImpl( self, url, flags, mode, handler, timeout );
@@ -795,7 +796,8 @@ namespace XrdCl
                                        OpenFlags::Flags                   flags,
                                        uint16_t                           mode,
                                        ResponseHandler                   *handler,
-                                       time_t                             timeout )
+                                       time_t                             timeout,
+                                       uint32_t                           wants)
   {
     XrdSysMutexHelper scopedLock( self->pMutex );
 
@@ -904,6 +906,11 @@ namespace XrdCl
       self->pFileState = Closed;
       return st;
     }
+    if (wants != 0) {
+      // We do not have the optiont supporting the type of flag one wants
+      // @abh3,how should we proceed to allow clients to pass the statx wants flag?
+      req->optiont |= kXR_retstatx;
+    }
     msg->Append( path.c_str(), path.length(), 24 );
 
     XRootDTransport::SetDescription( msg );
@@ -1007,7 +1014,8 @@ namespace XrdCl
   XRootDStatus FileStateHandler::Stat( std::shared_ptr<FileStateHandler> &self,
                                        bool                               force,
                                        ResponseHandler                   *handler,
-                                       time_t                             timeout )
+                                       time_t                             timeout,
+                                       uint32_t                           wants)
   {
     XrdSysMutexHelper scopedLock( self->pMutex );
 
@@ -1044,6 +1052,7 @@ namespace XrdCl
     MessageUtils::CreateRequest( msg, req );
 
     req->requestid = kXR_stat;
+    req->wants     = wants;
     memcpy( req->fhandle, self->pFileHandle, 4 );
 
     MessageSendParams params;
@@ -3456,6 +3465,8 @@ namespace XrdCl
       req->optiont |= kXR_dup;
     if( self->pOpenFlags & OpenFlags::Samefs )
       req->optiont |= kXR_samefs;
+    if (self->pOpenFlags & OpenFlags::RetStatx)
+      req->optiont |= kXR_retstatx;
 
     std::shared_ptr<FileStateHandler> tfp = self->pTemplateFileWp.lock();
     if(!tfp)

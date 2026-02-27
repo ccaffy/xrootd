@@ -744,14 +744,14 @@ void XrdPosixFile::ReadV(XrdOucCacheIOCB &iocb, const XrdOucIOVec *readV, int n)
 /*                                  S t a t                                   */
 /******************************************************************************/
 
-bool XrdPosixFile::Stat(XrdCl::XRootDStatus &Status, bool force)
+bool XrdPosixFile::Stat(XrdCl::XRootDStatus &Status, bool force, uint32_t wants)
 {
    XrdCl::StatInfo *sInfo = 0;
 
 // Get the stat information from the open file
 //
    Ref();
-   Status = clFile.Stat(force, sInfo);
+   Status = clFile.Stat(force, sInfo,0,wants);
    if (!Status.IsOK())
       {unRef();
        delete sInfo;
@@ -769,12 +769,22 @@ bool XrdPosixFile::Stat(XrdCl::XRootDStatus &Status, bool force)
 // If this is an extended stat then we can get some more info
 //
    if (sInfo->ExtendedFormat())
-      {myCtime = static_cast<time_t>(sInfo->GetChangeTime());
+      {// Flags2Mode only maps the simplified protocol flags to owner permission
+       // bits (S_IRUSR, S_IWUSR, S_IXUSR). The extended stat response carries
+       // the full POSIX permission mode as an octal string (e.g. "0644").
+       // Replace the permission bits while preserving the file type (S_IFMT).
+       mode_t realPerms = strtol(sInfo->GetModeAsString().c_str(), nullptr, 8);
+       myMode = (myMode & S_IFMT) | (realPerms & 07777);
+       myCtime = static_cast<time_t>(sInfo->GetChangeTime());
        myAtime = static_cast<time_t>(sInfo->GetAccessTime());
       } else {
        myCtime = myMtime;
        myAtime = time(0);
       }
+
+   if (sInfo->HasBirthTime()) {
+      mBTime = static_cast<time_t>(sInfo->GetBirthTime());
+   }
 
 // Delete our status information and return final result
 //

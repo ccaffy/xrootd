@@ -39,6 +39,7 @@
 #include "XrdCl/XrdClURL.hh"
 #include "XrdCl/XrdClXRootDResponses.hh"
 #include "XrdOuc/XrdOucECMsg.hh"
+#include "XrdSys/XrdSysStatx.hh"
 
 /******************************************************************************/
 /*                         X r d P o s i x A d m i n                          */
@@ -70,6 +71,8 @@ int            Query(XrdCl::QueryCode::Code reqCode, std::string& resp);
 bool           Stat(mode_t *flags=0, time_t *mtime=0);
 
 bool           Stat(struct stat &Stat);
+
+bool           Statx(unsigned int mask, XrdSysStatx &stx);
 
       XrdPosixAdmin(const char *path, XrdOucECMsg &ecm)
                       : Url((std::string)path), Xrd(Url), ecMsg(ecm) {}

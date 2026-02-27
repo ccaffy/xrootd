@@ -139,6 +139,7 @@ namespace XrdCl
       //! @param mode    Access::Mode for new files, 0 otherwise
       //! @param handler handler to be notified about the status of the operation
       //! @param timeout timeout value, if 0 the environment default will be
+      //! @param wants   statx stx_mask e.g: STATX_BASIC_STATS | STATX_BTIME.
       //!                used
       //! @return        status of the operation
       //------------------------------------------------------------------------
@@ -147,7 +148,8 @@ namespace XrdCl
                                 OpenFlags::Flags                   flags,
                                 uint16_t                           mode,
                                 ResponseHandler                   *handler,
-                                time_t                             timeout  = 0 );
+                                time_t                             timeout  = 0,
+                                uint32_t                           wants = 0);
 
       //------------------------------------------------------------------------
       //! Open the file pointed to by the given URL
@@ -193,12 +195,14 @@ namespace XrdCl
       //!                if the procedure is successful
       //! @param timeout timeout value, if 0 the environment default will
       //!                be used
+      //! @param wants   statx stx_mask e.g: STATX_BASIC_STATS | STATX_BTIME.
       //! @return        status of the operation
       //------------------------------------------------------------------------
       static XRootDStatus Stat( std::shared_ptr<FileStateHandler> &self,
                                 bool                               force,
                                 ResponseHandler                   *handler,
-                                time_t                             timeout = 0 );
+                                time_t                             timeout = 0 ,
+                                uint32_t                           wants = 0);
 
       //------------------------------------------------------------------------
       //! Preread data tracts at given offsets - async
@@ -907,7 +911,8 @@ namespace XrdCl
                                 OpenFlags::Flags                   flags,
                                 uint16_t                           mode,
                                 ResponseHandler                   *handler,
-                                time_t                             timeout  = 0 );
+                                time_t                             timeout  = 0,
+                                uint32_t                           wants = 0);
 
       //------------------------------------------------------------------------
       //! Re-send queued messages

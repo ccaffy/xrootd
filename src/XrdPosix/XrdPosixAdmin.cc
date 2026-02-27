@@ -37,7 +37,9 @@
 
 #include "XrdNet/XrdNetAddr.hh"
 #include "XrdPosix/XrdPosixAdmin.hh"
+#include "XrdPosix/XrdPosixConfig.hh"
 #include "XrdPosix/XrdPosixMap.hh"
+#include "XrdSys/XrdSysStatx.hh"
   
 /******************************************************************************/
 /*                                F a n O u t                                 */
@@ -234,12 +236,84 @@ bool XrdPosixAdmin::Stat(struct stat &Stat)
    Stat.st_mtime  = static_cast<time_t>(sInfo->GetModTime());
 
    if (sInfo->ExtendedFormat())
-      {Stat.st_ctime = static_cast<time_t>(sInfo->GetChangeTime());
+      {// Flags2Mode only maps the simplified protocol flags to owner permission
+       // bits (S_IRUSR, S_IWUSR, S_IXUSR). The extended stat response carries
+       // the full POSIX permission mode as an octal string (e.g. "0644").
+       // Replace the permission bits while preserving the file type (S_IFMT).
+       mode_t realPerms = strtol(sInfo->GetModeAsString().c_str(), nullptr, 8);
+       Stat.st_mode = (Stat.st_mode & S_IFMT) | (realPerms & 07777);
+       Stat.st_ctime = static_cast<time_t>(sInfo->GetChangeTime());
        Stat.st_atime = static_cast<time_t>(sInfo->GetAccessTime());
       } else {
        Stat.st_ctime = Stat.st_mtime;
        Stat.st_atime = time(0);
       }
+
+// Delete our status information and return final result
+//
+   delete sInfo;
+   return true;
+}
+
+/******************************************************************************/
+/*                                S t a t x                                   */
+/******************************************************************************/
+
+bool XrdPosixAdmin::Statx(unsigned int mask, XrdSysStatx &stx)
+{
+   XrdCl::XRootDStatus xStatus;
+   XrdCl::StatInfo    *sInfo = 0;
+
+// Make sure admin is ok
+//
+   if (!isOK()) return false;
+
+// Issue the stat with wants mask and verify that all went well
+//
+   xStatus = Xrd.Stat(Url.GetPathWithParams(), sInfo, 0, mask);
+   if (!xStatus.IsOK()) {
+      XrdPosixMap::Result(xStatus, ecMsg);
+      delete sInfo;
+      return false;
+   }
+
+// First fill a stat structure, then convert to statx
+//
+   struct stat buf;
+   XrdPosixConfig::initStat(&buf);
+   buf.st_size   = static_cast<size_t>(sInfo->GetSize());
+   buf.st_blocks = buf.st_size/512 + buf.st_size%512;
+   buf.st_ino    = static_cast<ino_t>(strtoll(sInfo->GetId().c_str(), 0, 10));
+   buf.st_mode   = XrdPosixMap::Flags2Mode(&buf.st_rdev, sInfo->GetFlags());
+   buf.st_mtime  = static_cast<time_t>(sInfo->GetModTime());
+
+   if (sInfo->ExtendedFormat()) {
+     // Flags2Mode only maps the simplified protocol flags to owner permission
+     // bits (S_IRUSR, S_IWUSR, S_IXUSR). The extended stat response carries
+     // the full POSIX permission mode as an octal string (e.g. "0644").
+     // Replace the permission bits while preserving the file type (S_IFMT).
+     mode_t realPerms = strtol(sInfo->GetModeAsString().c_str(), nullptr, 8);
+     buf.st_mode = (buf.st_mode & S_IFMT) | (realPerms & 07777);
+     buf.st_ctime = static_cast<time_t>(sInfo->GetChangeTime());
+     buf.st_atime = static_cast<time_t>(sInfo->GetAccessTime());
+   } else {
+     buf.st_ctime = buf.st_mtime;
+     buf.st_atime = time(0);
+   }
+
+// Convert stat to statx
+//
+   XrdSysStatxHelpers::Stat2Statx(buf, stx);
+
+// Handle birth time if requested and available
+//
+   if ((mask & STATX_BTIME) && sInfo->HasBirthTime()) {
+     stx.stx_mask |= STATX_BTIME;
+#ifdef HAVE_STATX
+     stx.stx_btime.tv_sec  = static_cast<int64_t>(sInfo->GetBirthTime());
+     stx.stx_btime.tv_nsec = 0;
+#endif
+   }
 
 // Delete our status information and return final result
 //

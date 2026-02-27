@@ -31,6 +31,7 @@
 #include "XrdOuc/XrdOucCache.hh"
 #include "XrdOuc/XrdOucCacheStats.hh"
 #include "XrdPosix/XrdPosixCache.hh"
+#include "XrdSys/XrdSysStatx.hh"
 
 /******************************************************************************/
 /*                               G l o b a l s                                */
@@ -88,6 +89,17 @@ int XrdPosixCache::Rename(const char* oldPath, const char* newPath)
   
 int XrdPosixCache::Stat(const char *path, struct stat &sbuff)
                        {return theCache->Stat(path, sbuff);}
+
+/******************************************************************************/
+
+int XrdPosixCache::Stat(const char *url, XrdSysStatx &stx, unsigned int mask)
+{
+   struct stat sbuf;
+   int rc = Stat(url, sbuf);
+   if (rc) return rc;
+   XrdSysStatxHelpers::Stat2Statx(sbuf, stx);
+   return 0;
+}
 
 /******************************************************************************/
 /*                            S t a t i s t i c s                             */

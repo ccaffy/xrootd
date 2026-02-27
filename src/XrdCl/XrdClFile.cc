@@ -126,7 +126,8 @@ namespace XrdCl
                            OpenFlags::Flags   flags,
                            Access::Mode       mode,
                            ResponseHandler   *handler,
-                           time_t             timeout )
+                           time_t             timeout,
+                           uint32_t           wants)
   {
     // Check if we need to install and run a plug-in for this URL
     InitPlugin(url);
@@ -141,7 +142,7 @@ namespace XrdCl
     if( pPlugIn )
       return pPlugIn->Open( url, flags, mode, handler, timeout );
 
-    return FileStateHandler::Open( pImpl->pStateHandler, url, flags, mode, handler, timeout );
+    return FileStateHandler::Open( pImpl->pStateHandler, url, flags, mode, handler, timeout, wants );
   }
 
   //----------------------------------------------------------------------------
@@ -235,12 +236,14 @@ namespace XrdCl
   //----------------------------------------------------------------------------
   XRootDStatus File::Stat( bool             force,
                            ResponseHandler *handler,
-                           time_t           timeout )
+                           time_t           timeout ,
+                           uint32_t         wants)
   {
     if( pPlugIn )
+      // @abh3 should the plugin have the wants mask as well?
       return pPlugIn->Stat( force, handler, timeout );
 
-    return FileStateHandler::Stat( pImpl->pStateHandler, force, handler, timeout );
+    return FileStateHandler::Stat( pImpl->pStateHandler, force, handler, timeout, wants );
   }
 
   //----------------------------------------------------------------------------
@@ -248,10 +251,11 @@ namespace XrdCl
   //----------------------------------------------------------------------------
   XRootDStatus File::Stat( bool       force,
                            StatInfo *&response,
-                           time_t     timeout )
+                           time_t     timeout ,
+                           uint32_t   wants)
   {
     SyncResponseHandler handler;
-    XRootDStatus st = Stat( force, &handler, timeout );
+    XRootDStatus st = Stat( force, &handler, timeout, wants);
     if( !st.IsOK() )
       return st;
 

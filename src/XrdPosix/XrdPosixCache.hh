@@ -30,6 +30,8 @@
 /* specific prior written permission of the institution or contributor.       */
 /******************************************************************************/
 
+#include "XrdSys/XrdSysStatx.hh"
+
 class XrdOucCacheStats;
 
 class XrdPosixCache
@@ -97,6 +99,20 @@ int           Rename(const char* oldPath, const char* newPath);
 //-----------------------------------------------------------------------------
 
 int           Stat(const char *path, struct stat &sbuff);
+
+//-----------------------------------------------------------------------------
+//! Obtain stat information for a file in the cache (statx variant).
+//!
+//! @param  url     -> url of the logical file to check in the cache.
+//! @param  stx     Reference to the XrdSysStatx structure to hold the info.
+//! @param  mask    statx stx_mask indicating which fields are requested.
+//!
+//! @return =0      The stx holds the information.
+//! @return >0      The file or directory does not exist in the cache.
+//! @return <0      An error occurred, the return value is -errno.
+//-----------------------------------------------------------------------------
+
+int           Stat(const char *url, XrdSysStatx &stx, unsigned int mask);
 
 //-----------------------------------------------------------------------------
 //! Rename a file or directory in the cache.

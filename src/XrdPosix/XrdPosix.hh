@@ -39,6 +39,7 @@
 // First define the external interfaces (not C++ but OS compatabile)
 #include <dirent.h>
 #include "XrdPosixExtern.hh"
+#include "XrdSys/XrdSysStatx.hh"
 
 // Then redefine them
 #define access(a,b)      XrdPosix_Access(a,b)
@@ -115,5 +116,9 @@
 #define write(a,b,c)     XrdPosix_Write(a,b,c)
 
 #define writev(a,b,c)    XrdPosix_Writev(a,b,c)
+
+#ifdef HAVE_STATX
+#define statx(d,p,f,m,b)  XrdPosix_Statx(d,p,f,m,b)
+#endif
 
 #endif

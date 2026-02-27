@@ -39,6 +39,7 @@
 #include <sys/uio.h>
 
 #include "XrdSys/XrdSysHeaders.hh"
+#include "XrdSys/XrdSysStatx.hh"
 #include "XrdPosix/XrdPosixLinkage.hh"
 #include "XrdPosix/XrdPosixXrootd.hh"
 #include "XrdPosix/XrdPosixXrootdPath.hh"
@@ -930,7 +931,55 @@ int XrdPosix_Stat(const char *path, struct stat *buf)
           : Xroot.Stat(myPath, buf));
 }
 }
-  
+
+/******************************************************************************/
+/*                        X r d P o s i x _ S t a t x                         */
+/******************************************************************************/
+
+extern "C"
+{
+
+namespace {
+   int StatxFallback(const char *path, XrdSysStatx *stx)
+   {
+      struct stat sbuf;
+      if (XrdPosix_Stat(path, &sbuf) != 0)
+         return -1;
+      XrdSysStatxHelpers::Stat2Statx(sbuf, *stx);
+      return 0;
+   }
+}
+
+int XrdPosix_Statx(int dirfd, const char *path, int flags,
+                   unsigned int mask, XrdSysStatx *stx)
+{
+   char *myPath, buff[2048];
+
+// Make sure a path was passed
+//
+   if (!path) {errno = EFAULT; return -1;}
+
+// Select local and remote statx implementations
+//
+#ifdef HAVE_STATX
+   auto localStatx  = [&dirfd, &path, &flags, &mask, &stx]{ return Xunix.Statx(dirfd, path, flags, mask, stx); };
+   auto remoteStatx = [&myPath, &mask, &stx]{ return Xroot.Statx(myPath, mask, stx); };
+#else
+   auto localStatx  = [&path, &stx]{ return StatxFallback(path, stx); };
+   auto remoteStatx = [&path, &stx]{ return StatxFallback(path, stx); };
+#endif
+
+// Return the results for a local file (preserve dirfd and flags)
+//
+   if (!(myPath = XrootPath.URL(path, buff, sizeof(buff))))
+      return localStatx();
+
+// Return the results of remote statx()
+//
+   return remoteStatx();
+}
+}
+
 /******************************************************************************/
 /*                       X r d P o s i x _ S t a t f s                        */
 /******************************************************************************/

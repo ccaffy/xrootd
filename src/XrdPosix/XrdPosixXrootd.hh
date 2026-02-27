@@ -47,6 +47,7 @@
 
 #include "XrdPosix/XrdPosixOsDep.hh"
 #include "XrdSys/XrdSysPthread.hh"
+#include "XrdSys/XrdSysStatx.hh"
 
 struct XrdOucIOVec;
 
@@ -322,6 +323,20 @@ static void    Seekdir(DIR *dirp, long loc);
 //-----------------------------------------------------------------------------
 
 static int     Stat(const char *path, struct stat *buf);
+
+//-----------------------------------------------------------------------------
+//! Statx() is a POSIX extension conforming to the Linux statx() interface.
+//! It provides extended stat information including birth time.
+//!
+//! @param  path  file/directory path
+//! @param  mask  statx mask indicating which fields are requested
+//!               (e.g., STATX_BASIC_STATS | STATX_BTIME)
+//! @param  stx   pointer to an XrdSysStatx structure to receive results
+//!
+//! @return 0 on success, -1 on failure with errno set.
+//-----------------------------------------------------------------------------
+
+static int     Statx(const char *path, unsigned int mask, XrdSysStatx *stx);
 
 //-----------------------------------------------------------------------------
 //! Statfs() generally conforms to the platform-specific definition of statfs().

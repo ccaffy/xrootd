@@ -21,6 +21,7 @@
 #include "XrdCl/XrdClDefaultEnv.hh"
 #include "XrdCl/XrdClPlugInManager.hh"
 #include "GTestXrdHelpers.hh"
+#include "XrdSys/XrdSysStatx.hh"
 
 #include <pthread.h>
 #include <sys/stat.h>
@@ -43,6 +44,9 @@ class FileSystemTest: public ::testing::Test
     void ChmodTest();
     void PingTest();
     void StatTest();
+#ifdef HAVE_STATX
+    void StatxTest();
+#endif
     void StatVFSTest();
     void ProtocolTest();
     void DeepLocateTest();
@@ -94,6 +98,13 @@ TEST_F(FileSystemTest, StatTest)
 {
   StatTest();
 }
+
+#ifdef HAVE_STATX
+TEST_F(FileSystemTest, StatxTest)
+{
+  StatxTest();
+}
+#endif
 
 TEST_F(FileSystemTest, StatVFSTest)
 {
@@ -423,6 +434,50 @@ void FileSystemTest::StatTest()
   EXPECT_TRUE( !response->TestFlags( StatInfo::IsDir ) );
   delete response;
 }
+
+//------------------------------------------------------------------------------
+// Stat test
+//------------------------------------------------------------------------------
+#ifdef HAVE_STATX
+void FileSystemTest::StatxTest()
+{
+  using namespace XrdCl;
+
+  Env *testEnv = TestEnv::GetEnv();
+
+  std::string address;
+  std::string remoteFile;
+  std::string localDataPath;
+
+  EXPECT_TRUE( testEnv->GetString( "MainServerURL", address ) );
+  EXPECT_TRUE( testEnv->GetString( "RemoteFile",    remoteFile ) );
+  EXPECT_TRUE( testEnv->GetString( "LocalDataPath", localDataPath ) );
+
+  std::string localFilePath = localDataPath + "/srv1" + remoteFile;
+
+  struct statx localStatBuf;
+  int rc = statx(AT_FDCWD,localFilePath.c_str(), AT_STATX_SYNC_AS_STAT,STATX_BASIC_STATS | STATX_BTIME, &localStatBuf);
+  EXPECT_EQ( rc, 0 );
+  uint64_t fileSize = localStatBuf.stx_size;
+
+  URL url( address );
+  EXPECT_TRUE( url.IsValid() );
+
+  FileSystem fs( url );
+  StatInfo *response = 0;
+  EXPECT_XRDST_OK( fs.Stat( remoteFile, response, 0, STATX_BASIC_STATS | STATX_BTIME) );
+  ASSERT_TRUE( response );
+  // Statx has not been implemented in XrdOss layers so the birthtime will not be present
+  // Once it is implemented in the future, then this test will have to be changed
+  ASSERT_FALSE(response->HasBirthTime());
+  ASSERT_EQ(0,response->GetBirthTime());
+  EXPECT_EQ( response->GetSize(), fileSize );
+  EXPECT_TRUE( response->TestFlags( StatInfo::IsReadable ) );
+  EXPECT_TRUE( response->TestFlags( StatInfo::IsWritable ) );
+  EXPECT_TRUE( !response->TestFlags( StatInfo::IsDir ) );
+  delete response;
+}
+#endif
 
 //------------------------------------------------------------------------------
 // Stat VFS test
