@@ -618,7 +618,13 @@ static inline const std::pair<std::string,std::string> decodedEncodedOpaque [] {
   {"authz=Bearer token","authz=Bearer%20token"},
   {"test=test1&authz=Bearer token","test=test1&authz=Bearer%20token"},
   {"test=","test="},
-  {"test=&authz=Bearer token&authz2=[]","test=&authz=Bearer%20token&authz2=%5B%5D"}
+  {"test=&authz=Bearer token&authz2=[]","test=&authz=Bearer%20token&authz2=%5B%5D"},
+  // CRLF smuggled across the '=' boundary must not survive into the
+  // encoded output (otherwise it would land verbatim in a Location:
+  // header and split the response).
+  {"\r\nSet-Cookie: pwn=1","%0D%0ASet-Cookie%3A%20pwn=1"},
+  {"a:b=c","a%3Ab=c"},
+  {"foo bar=baz","foo%20bar=baz"}
 };
 
 TEST(XrdHttpTests,encodeOpaqueTest) {
